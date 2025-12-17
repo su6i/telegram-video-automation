@@ -1,0 +1,59 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# Virtual Env
+venv/
+env/
+ENV/
+.env
+
+# Project Specific
+downloads/
+processed/
+mongard_videos_temp/
+videos.txt
+failed.txt
+temp_link.txt
+upload_log.json
+backup_captions.json
+
+# Telegram Sessions (Critical!)
+*.session
+*.session-journal
+
+# Media / Artifacts
+*.mp4
+*.mkv
+*.jpg
+*.png
+*.ass
+test_output.*
+title_preview.png
+frame_*.png
+
+# macOS
+.DS_Store
+
+# IDE
+.vscode/
+.idea/

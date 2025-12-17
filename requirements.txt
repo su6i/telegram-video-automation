@@ -1,0 +1,13 @@
+requests
+beautifulsoup4
+yt-dlp
+selenium
+webdriver_manager
+tqdm
+python-telegram-bot
+pyrogram
+tgcrypto
+python-dotenv
+pillow
+arabic-reshaper
+python-bidi
