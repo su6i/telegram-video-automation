@@ -7,13 +7,13 @@ import re
 from PIL import Image, ImageDraw, ImageFont
 import textwrap
 
-# حد آستانه تقسیم (45MB)
+# Threshold for splitting (45MB)
 SIZE_THRESHOLD_MB = 45
 BOT_MAX_SIZE_MB = 45
 USER_MAX_SIZE_MB = 1900  # 1.9GB
 
 def get_video_info(input_path):
-    """دریافت اطلاعات کامل ویدیو"""
+    """Get full video information."""
     try:
         cmd = [
             "ffprobe", "-v", "quiet", "-print_format", "json", 
@@ -24,7 +24,7 @@ def get_video_info(input_path):
         if result.returncode == 0:
             data = json.loads(result.stdout)
             
-            # یافتن stream ویدیو
+            # Find video stream
             video_stream = None
             for stream in data.get('streams', []):
                 if stream.get('codec_type') == 'video':
@@ -48,14 +48,14 @@ def get_video_info(input_path):
         
         return None
     except Exception as e:
-        print(f"خطا در دریافت اطلاعات ویدیو: {str(e)}")
+        print(f"Error getting video info: {str(e)}")
         return None
 
 def get_smart_title(input_path):
     """
-    استخراج هوشمند تیتر:
-    ۱. تلاش برای خواندن تیتر از متادیتای فایل (اولویت بالا)
-    ۲. اگر نبود، استفاده از اسم فایل و تمیزکاری آن
+    Smart title extraction:
+    1. Try reading title from file metadata (high priority)
+    2. If missing, use filename and clean it up
     """
     filename = os.path.basename(input_path)
     
@@ -71,57 +71,57 @@ def get_smart_title(input_path):
     # "001_Title_Name.mp4" -> "Title Name"
     base_name = os.path.splitext(filename)[0]
     
-    # الگوی "Number - Title"
+    # Pattern "Number - Title"
     if " - " in base_name:
         parts = base_name.split(" - ", 1)
         if len(parts) == 2:
             return parts[1].strip()
             
-    # الگوی "Number_Title"
-    # حذف پیشوند عددی اگر باشد (001_)
+    # Pattern "Number_Title"
+    # Remove numeric prefix if exists (001_)
     clean_name = re.sub(r'^\d+[_ ]', '', base_name)
-    # تبدیل _ به فاصله
+    # Replace _ with space
     clean_name = clean_name.replace('_', ' ')
     
     return clean_name.strip()
 
 def calculate_optimal_segments(file_size_mb, target_size_mb=40):
-    """محاسبه تعداد بهینه قسمت‌ها برای ربات"""
+    """Calculate optimal number of segments for bot."""
     if file_size_mb <= target_size_mb:
         return 1
     
-    # محاسبه تعداد قسمت‌ها با در نظر گیری 10% overhead
+    # Calculate segments considering 10% overhead
     segments = math.ceil(file_size_mb / (target_size_mb * 0.9))
     return segments
 
 def create_intro_video(title, output_intro_path, font_path="src/fonts/Vazir-Bold.ttf"):
-    """ساخت ویدیوی اینترو ۳ ثانیه‌ای از عنوان"""
+    """Create a 3-second intro video from title."""
     try:
-        # تنظیمات تصویر
+        # Image settings
         width, height = 1920, 1080
         background_color = (0, 0, 0)
         text_color = (255, 255, 255)
         
-        # ساخت تصویر
+        # Create image
         img = Image.new('RGB', (width, height), color=background_color)
         draw = ImageDraw.Draw(img)
         
-        # لود فونت
+        # Load font
         try:
             font_size = 120
             font = ImageFont.truetype(font_path, font_size)
         except OSError:
-            print(f"⚠️ فونت {font_path} پیدا نشد، از فونت پیش‌فرض استفاده می‌شود.")
+            print(f"⚠️ Font {font_path} not found, using default font.")
             font = ImageFont.load_default()
             font_size = 40
 
-        # تنظیم متن (Word Wrap)
-        # تخمین تقریبی تعداد کاراکتر در هر خط
+        # Text settings (Word Wrap)
+        # Approximate characters per line
         chars_per_line = 25 
         lines = textwrap.wrap(title, width=chars_per_line)
         
-        # محاسبه ارتفاع کل متن برای وسط‌چین کردن
-        # در پیلوهای جدید, textbbox دقیق‌تر است اما برای سادگی فعلا تقریبی می‌رویم یا از getbbox
+        # Calculate total text height for centering
+        # In newer Pillow, textbbox is more accurate but keeping it simple for now
         # getbbox availability depends on version.
         # Let's use simple logic: line_height approx 1.5 * font_size
         line_height = int(font_size * 1.5)
@@ -130,7 +130,7 @@ def create_intro_video(title, output_intro_path, font_path="src/fonts/Vazir-Bold
         current_y = (height - total_text_height) // 2
         
         for line in lines:
-            # وسط‌چین افقی
+            # Horizontal centering
             # draw.textlength is available in newer Pillow
             text_width = draw.textlength(line, font=font)
             current_x = (width - text_width) // 2
@@ -138,18 +138,18 @@ def create_intro_video(title, output_intro_path, font_path="src/fonts/Vazir-Bold
             draw.text((current_x, current_y), line, font=font, fill=text_color)
             current_y += line_height
             
-        # ذخیره تصویر موقت
+        # Save temporary image
         temp_image = "temp_intro.png"
         img.save(temp_image)
         
-        # تبدیل تصویر به ویدیو ۳ ثانیه‌ای با ffmpeg
+        # Convert image to 3-second video with ffmpeg
         # -loop 1 -i image -t 3 ...
         cmd = [
             "ffmpeg", "-y",
             "-loop", "1",
             "-i", temp_image,
-            "-f", "lavfi", "-i", "anullsrc=channel_layout=stereo:sample_rate=44100", # سکوت صوتی
-            "-t", "2", # 2 ثانیه کافیست
+            "-f", "lavfi", "-i", "anullsrc=channel_layout=stereo:sample_rate=44100", # Silence audio
+            "-t", "2", # 2 seconds is enough
             "-c:v", "libx264",
             "-tune", "stillimage",
             "-c:a", "aac",
@@ -160,42 +160,42 @@ def create_intro_video(title, output_intro_path, font_path="src/fonts/Vazir-Bold
         
         subprocess.run(cmd, capture_output=True, check=True)
         
-        # حذف تصویر موقت
+        # Delete temporary image
         if os.path.exists(temp_image):
             os.remove(temp_image)
             
         return True
     except Exception as e:
-        print(f"❌ خطا در ساخت اینترو: {e}")
+        print(f"❌ Error creating intro: {e}")
         return False
 
 def add_intro_to_video(video_path, title, output_path):
-    """اضافه کردن اینترو به ابتدای ویدیو"""
+    """Add intro to the beginning of the video."""
     intro_path = "temp_intro_video.mp4"
     temp_concat_list = "concat_list.txt"
     
     try:
-        # 1. ساخت اینترو
+    try:
+        # 1. Create intro
         if not create_intro_video(title, intro_path):
             return False
             
-        # 2. اسکیل کردن اینترو به اندازه ویدیوی اصلی (اگر لازم باشد)
-        # فعلا فرض می‌کنیم ویدیو اصلی هم Aspect Ratio استاندارد دارد یا پلیر هندل می‌کند.
-        # برای اطمینان بهتر است اینترو را به رزولوشن ویدیو اصلی تبدیل کنیم، ولی فعلا Re-encode کلی می‌کنیم.
+        # 2. Scale intro to match main video size (if needed)
+        # We assume main video has standard Aspect Ratio or player handles it.
+        # For better reliability, we should convert intro to main video resolution, but currently we are re-encoding everything.
         
-        # روش Concat Demuxer (سریعتر اما نیاز به کدک یکسان دارد)
-        # بنابراین باید اینترو را بسازیم و بعد همه را Encode کنیم.
-        # یا از filter_complex استفاده کنیم که مطمئن‌تر است.
+        # Concat Demuxer method (faster but requires same codec)
+        # So we must create intro and then encode everything.
+        # Or use filter_complex which is safer.
         
-        # بیایید از filter_complex استفاده کنیم که ریسایز را هم هندل کند.
+        # Let's use filter_complex which handles resize too.
         # [0:v] [1:v] concat=n=2:v=1:a=1 [v] [a]
         
-        # اما برای سادگی و پرفورمنس، بیایید فرض کنیم می خواهیم خروجی نهایی استاندارد باشد.
+        # But for simplicity and performance, assume we want standard output.
         
-        # استراتژی: 
-        # ما در process_safe در حال re-encode هستیم. پس می‌توانیم همانجا این کار را انجام دهیم.
-        # اما اگر بخواهیم جدا انجام دهیم دوباره کاری است.
-        # بیایید تابع process را تغییر دهیم که این کار را بکند.
+        # Strategy: 
+        # We are re-encoding in process_safe anyway. So we can do it there.
+        # Doing it separately is redundant.
         pass 
         
     except Exception as e:
@@ -203,25 +203,25 @@ def add_intro_to_video(video_path, title, output_path):
         return False
 
 async def process_video_for_bot_safe(input_path, output_path, title):
-    """پردازش ویدیو برای ربات (نسخه ایمن‌تر) + اینترو"""
+    """Process video for bot (safer version) + intro"""
     try:
         file_size_mb = os.path.getsize(input_path) / (1024 * 1024)
         
-        print(f"🤖 پردازش برای ربات - {title}")
-        print(f"   📏 اندازه اصلی: {file_size_mb:.2f}MB")
+        print(f"🤖 Processing for bot - {title}")
+        print(f"   📏 Original size: {file_size_mb:.2f}MB")
         
         intro_path = f"intro_{os.path.basename(input_path)}"
         
-        # ساخت اینترو
+        # Create intro
         intro_created = create_intro_video(title, intro_path)
         
         if intro_created:
-            print("   🎞️ اینترو ساخته شد.")
-            # استفاده از filter_complex برای چسباندن
-            # ما نیاز داریم ورودی‌ها را اسکیل کنیم تا هم‌اندازه شوند (1280x720 مثلا برای ربات خوبه)
+            print("   🎞️ Intro created.")
+            # Use filter_complex for concatenation
+            # We need to scale inputs to match (e.g., 1280x720 is good for bot)
             # scale=1280:720:force_original_aspect_ratio=decrease,pad=1280:720:(ow-iw)/2:(oh-ih)/2
             
-            # برای اطمینان، هر دو را به یک سایز مشخص می‌بریم (مثلا HD Ready)
+            # For reliability, force both to a specific size (e.g. HD Ready)
             target_w, target_h = 1280, 720
             
             process_cmd = [
@@ -242,8 +242,8 @@ async def process_video_for_bot_safe(input_path, output_path, title):
                 output_path
             ]
         else:
-            print("   ⚠️ خطا در ساخت اینترو، ادامه بدون اینترو...")
-            # فال‌بک به پردازش معمولی
+            print("   ⚠️ Error creating intro, continuing without intro...")
+            # Fallback to normal processing
             process_cmd = [
                 "ffmpeg", "-y",
                 "-i", input_path,
@@ -260,48 +260,48 @@ async def process_video_for_bot_safe(input_path, output_path, title):
             process_cmd, 
             capture_output=True, 
             text=True,
-            timeout=900 # 15 دقیقه (چون re-encode است)
+            timeout=900 # 15 minutes (since it's re-encode)
         )
         
         if intro_created and os.path.exists(intro_path):
             os.remove(intro_path)
         
         if result.returncode != 0:
-            print(f"   ❌ خطای ffmpeg (کد {result.returncode}):")
+            print(f"   ❌ ffmpeg error (code {result.returncode}):")
             print(f"   📝 stderr: {result.stderr[-300:]}")
             return False
         
         if os.path.exists(output_path) and os.path.getsize(output_path) > 1000:
             new_size = os.path.getsize(output_path) / (1024 * 1024)
-            print(f"   ✅ پردازش موفق - اندازه: {new_size:.2f}MB")
+            print(f"   ✅ Processing successful - Size: {new_size:.2f}MB")
             return True
         
         return False
         
     except Exception as e:
-        print(f"   ❌ خطا در پردازش: {str(e)}")
+        print(f"   ❌ Processing error: {str(e)}")
         # Cleanup intro if exists
         #if os.path.exists(intro_path): os.remove(intro_path)
         return False
 
 async def process_video_for_user_safe(input_path, output_path, title):
-    """پردازش ویدیو برای اکانت کاربری (همراه با اینترو)"""
+    """Process video for user account (with intro)"""
     try:
         file_size_mb = os.path.getsize(input_path) / (1024 * 1024)
         
-        print(f"👤 پردازش برای اکانت کاربری - {title}")
-        print(f"   📏 اندازه اصلی: {file_size_mb:.2f}MB")
+        print(f"👤 Processing for user account - {title}")
+        print(f"   📏 Original size: {file_size_mb:.2f}MB")
         
         intro_path = f"intro_user_{os.path.basename(input_path)}"
         intro_created = create_intro_video(title, intro_path)
         
         if intro_created:
-             # برای یوزر اکانت کیفیت بالاتر (1920x1080)
+             # Higher quality for user account (1920x1080)
             target_w, target_h = 1920, 1080
             
-            # نکته: اگر ویدیو اصلی صدا نداشته باشد concat fail می‌شود؟ 
-            # ما در create_intro_video صدای سکوت اضافه کردیم.
-            # ویدیوهای آموزشی معمولا صدا دارند.
+            # Note: If original video has no audio, concat might fail?
+            # We added silent audio in create_intro_video.
+            # Tutorial videos usually have audio.
             
             process_cmd = [
                 "ffmpeg", "-y",
@@ -314,14 +314,14 @@ async def process_video_for_user_safe(input_path, output_path, title):
                 "-map", "[outv]", "-map", "[outa]",
                 "-c:v", "libx264", # Re-encoding is mandatory for concat filter
                 "-c:a", "aac",
-                "-preset", "medium", # سریع‌تر
+                "-preset", "medium", # Faster
                 "-crf", "23",
                 "-pix_fmt", "yuv420p",
                 "-movflags", "+faststart",
                 output_path
             ]
         else:
-             # اگر اینترو نشد، فقط کپی می‌کنیم (مانند قبل)
+             # If intro failed, just copy (like before)
             process_cmd = [
                 "ffmpeg", "-y",
                 "-i", input_path,
@@ -334,30 +334,30 @@ async def process_video_for_user_safe(input_path, output_path, title):
             process_cmd, 
             capture_output=True, 
             text=True,
-            timeout=1800  # 30 دقیقه
+            timeout=1800  # 30 minutes
         )
         
         if intro_created and os.path.exists(intro_path):
             os.remove(intro_path)
         
         if result.returncode != 0:
-            print(f"   ❌ خطای ffmpeg (کد {result.returncode}):")
+            print(f"   ❌ ffmpeg error (code {result.returncode}):")
             print(f"   📝 stderr: {result.stderr[-300:]}")
             return False
         
         if os.path.exists(output_path) and os.path.getsize(output_path) > 1000:
             new_size = os.path.getsize(output_path) / (1024 * 1024)
-            print(f"   ✅ پردازش موفق - اندازه: {new_size:.2f}MB")
+            print(f"   ✅ Processing successful - Size: {new_size:.2f}MB")
             return True
         
         return False
         
     except Exception as e:
-        print(f"   ❌ خطا در پردازش: {str(e)}")
+        print(f"   ❌ Processing error: {str(e)}")
         return False
 
 async def split_video_for_bot_safe(input_path, output_dir, title, target_size_mb=40):
-    """تقسیم ویدیو برای ربات + اضافه کردن اینترو به قسمت اول"""
+    """Split video for bot + add intro to the first part."""
     try:
         video_info = get_video_info(input_path)
         if not video_info or video_info['duration'] <= 0:
@@ -367,29 +367,29 @@ async def split_video_for_bot_safe(input_path, output_dir, title, target_size_mb
         duration = video_info['duration']
         segments = calculate_optimal_segments(file_size_mb, target_size_mb)
         
-        print(f"✂️ تقسیم برای ربات به {segments} قسمت...")
+        print(f"✂️ Splitting for bot into {segments} parts...")
         
         segment_duration = duration / segments
         output_files = []
         
-        # ساخت اینترو اصلی یکبار
+        # Create main intro once
         intro_path = f"intro_split_{os.path.basename(input_path)}"
         intro_created = create_intro_video(title, intro_path)
         
         for i in range(segments):
             start_time = i * segment_duration
             safe_title = re.sub(r'[^\w\-_\s]', '_', title)
-            # قسمت اول "intro_" نامیده می‌شود تا بدانیم اینترو دارد؟ نه، فقط خروجی نهایی
+            # First part named "intro_" to know it has intro? No, just final output
             output_path = os.path.join(output_dir, f"{safe_title}_bot_part{i+1:02d}.mp4")
             
-            print(f"   📹 قسمت {i+1}/{segments}...")
+            print(f"   📹 Part {i+1}/{segments}...")
             
-            # اگر قسمت اول است و اینترو داریم -> Concat
+            # If first part AND we have intro -> Concat
             if i == 0 and intro_created:
-                 # باید قسمت اول را ببریم، سپس با اینترو ترکیب کنیم
-                 # این کار با یک دستور پیچیده می‌شود.
-                 # بهتر است ابتدا ویدیو را Split کنیم، سپس اینترو را به قسمت اول بچسبانیم؟
-                 # یا در همان دستور انجام دهیم.
+                 # Need to trim first part, then concat with intro
+                 # Complex command needed.
+                 # Better to split video first, then attach intro to part 1?
+                 # Or do it in one command.
                  
                  # trim first part
                  # [0:v] -> intro
@@ -416,8 +416,8 @@ async def split_video_for_bot_safe(input_path, output_dir, title, target_size_mb
                     output_path
                  ]
             else:
-                # قسمت‌های بعدی بدون اینترو
-                # فقط re-encode ساده (یا کپی؟ نه برای اسپلیت دقیق re-encode بهتر است)
+                # Next parts without intro
+                # Just simple re-encode (or copy? No, re-encode is better for accurate split)
                 split_cmd = [
                     "ffmpeg", "-y",
                     "-ss", str(start_time),
@@ -436,16 +436,16 @@ async def split_video_for_bot_safe(input_path, output_dir, title, target_size_mb
                 
                 if result.returncode == 0 and os.path.exists(output_path) and os.path.getsize(output_path) > 1000:
                     part_size = os.path.getsize(output_path) / (1024 * 1024)
-                    print(f"   ✅ قسمت {i+1} آماده - {part_size:.2f}MB")
+                    print(f"   ✅ Part {i+1} ready - {part_size:.2f}MB")
                     output_files.append(output_path)
                 else:
-                    print(f"   ❌ خطا در قسمت {i+1}: {result.stderr[-200:] if result.stderr else 'نامشخص'}")
+                    print(f"   ❌ Error in part {i+1}: {result.stderr[-200:] if result.stderr else 'unknown'}")
                 
             except subprocess.TimeoutExpired:
-                print(f"   ⏰ timeout در قسمت {i+1}")
+                print(f"   ⏰ Timeout in part {i+1}")
                 continue
             except Exception as e:
-                print(f"   ❌ خطا در قسمت {i+1}: {str(e)}")
+                print(f"   ❌ Error in part {i+1}: {str(e)}")
                 continue
         
         if intro_created and os.path.exists(intro_path):
@@ -454,15 +454,15 @@ async def split_video_for_bot_safe(input_path, output_dir, title, target_size_mb
         return output_files
         
     except Exception as e:
-        print(f"❌ خطا در تقسیم: {str(e)}")
+        print(f"❌ Error during split: {str(e)}")
         if 'intro_path' in locals() and os.path.exists(intro_path): os.remove(intro_path)
         return []
 
 def normalize_title(title):
-    """تطبیق عنوان برای مقایسه"""
-    # حذف کاراکترهای اضافی و نرمال‌سازی
+    """Normalize title for comparison."""
+    # Remove extra chars and normalize
     title = title.strip()
-    title = re.sub(r'\s+', ' ', title)  # حذف فاصله‌های اضافی
-    title = title.replace('ویدیو ', '')  # حذف پیشوند ویدیو
-    title = title.replace('آموزش ', '')  # حذف پیشوند آموزش
+    title = re.sub(r'\s+', ' ', title)  # Remove extra spaces
+    title = title.replace('Video ', '')  # Remove 'Video' prefix
+    title = title.replace('Tutorial ', '')  # Remove 'Tutorial' prefix
     return title.lower()

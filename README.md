@@ -62,6 +62,7 @@ telegram-video-automation/
 
 ### 1. Prerequisites
 *   **Python 3.10** or higher.
+*   **yt-dlp**: Automatically installed via requirements.txt, but essential for core functionality.
 *   **FFmpeg**: Must be installed and accessible in your system PATH.
     *   *Mac*: `brew install ffmpeg`
     *   *Linux*: `apt install ffmpeg`
@@ -97,48 +98,70 @@ TELEGRAM_TOKEN=123456:ABC-DEF...
 
 ## 🕹️ Usage Guide
 
-### Step 1: Customize Scraper (Optional)
-If you already have local videos, skip to Step 2.
-To download videos, edit `src/scrapers/site_scraper.py`. Implement the `get_video_links()` method to return a list of video objects.
-Then run:
+### Step 1: Authentication (One-Time)
+Before scraping or uploading, you need to authenticate.
+1. **Interactive Login**: Opens a browser for you to log in to the target site.
+   ```bash
+   ./run_auth.sh
+   ```
+
+2. **Telegram Login**: If you plan to upload, authenticate your Telegram account.
+   ```bash
+   python scripts/auth_login.py
+   ```
+
+### Step 2: Download Videos (Smart Scraper) 🧠
+The new smart scraper handles everything: scanning, manifest generation, incremental saving, and robust downloading.
+
+**1. Scan Library:**
+Scans all enrolled courses and generates `video_manifest.txt` with organized Course and Section headers.
 ```bash
-python scripts/run_scraper.py
+./run_smart.sh --scan
 ```
+*   **Incremental Save:** Progress is saved every 5 videos. If it crashes, you don't lose data.
+*   **Output:** Generates `video_manifest.txt`.
 
-### Step 2: Authenticate (One-Time)
-To allow the script to upload as **YOU** (not a bot), login once:
+**2. Review & Edit Manifest (Optional):**
+Open `video_manifest.txt`. You can:
+*   Comment out lines (add `#` at start) to skip specific videos.
+*   Delete lines to remove them from download queue.
+*   Rename titles directly in the file.
+
+**3. Download Videos:**
+Reads the manifest and downloads files to `downloads/`.
 ```bash
-python scripts/auth_login.py
+./run_smart.sh --download
 ```
-*Follow the on-screen prompts to verify your phone number.*
+*   **Auto Resume:** Automatically resumes interrupted downloads (native `yt-dlp` support).
+*   **Retry Logic:** Tries 10 times before giving up on a file.
+*   **Failure Log:** Failed downloads are saved to `failed_downloads.txt` for easy retry.
 
-### Step 3: Run the Pipeline 🚀
-Start the magic. This command will:
-1.  Look for videos in `downloads/`.
-2.  Generate title cards for them.
-3.  Upload them to your configured Channel.
-
+### Step 3: Process & Upload 🚀
+Start the processing pipeline to merge intros and upload to Telegram:
 ```bash
 python scripts/process_and_upload.py
 ```
-*Tip: This script is safe to restart. It skips already processed files.*
-
----
-
-## 🛠️ Advanced Tools
-
-### 🔍 Find Channel ID
-Not sure what your Channel ID is? Or getting `Peer id invalid` errors?
-Run the diagnostic tool:
-```bash
-python scripts/diagnose_channel.py
-```
-*It will scan your dialogs and even check "Saved Messages" for forwarded posts to find the real ID.*
 
 ### 📉 Check Missing Videos
 Want to know if you missed any episode number in your channel sequence?
 ```bash
 python scripts/check_channel_history.py
+```
+
+## ⚙️ Configuration (.env)
+
+Ensure your `.env` file has the new generic configuration keys:
+
+```ini
+# --- Target Site Credentials ---
+TARGET_SITE_BASE_URL="https://www.contentcreator.com"
+TARGET_SITE_EMAIL="your_email@example.com"
+TARGET_SITE_PASSWORD="your_password"
+
+# --- Telegram API Credentials ---
+API_ID=12345678
+API_HASH=your_api_hash_here
+CHANNEL_ID=-1001234567890
 ```
 
 ---
