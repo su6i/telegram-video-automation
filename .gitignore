@@ -36,6 +36,10 @@ failed.txt
 temp_link.txt
 upload_log.json
 backup_captions.json
+video_manifest.txt
+video_manifest_bakup.txt
+debug_course_source.html
+auth_cookies.json
 
 # Telegram Sessions (Critical!)
 *.session
