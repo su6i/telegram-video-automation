@@ -6,6 +6,15 @@
 
 ---
 
+## ⚡ Quick Start
+```bash
+./scan.sh      # 🔍 Map structure
+./download.sh  # 📥 Fetch media
+./upload.sh    # 🚀 Optimize & Post
+```
+
+---
+
 ## 🏗️ 3-Step Automated Workflow
 
 ```mermaid
@@ -17,51 +26,46 @@ graph LR
     style C fill:#bfb,stroke:#333,stroke-width:2px
 ```
 
-The system is designed to be fully automated. You only need to run three commands in sequence:
+The system is designed to be a fully automated bridge between web content and Telegram delivery.
 
-### 1. 🔍 Scan
-Scrapes the target platform to identify all lessons and metadata.
-```bash
-./scan.sh
-```
-
-### 2. 📥 Download
-Fetches the video files into the local `downloads/` directory.
-```bash
-./download.sh
-```
-
-### 3. 🚀 Upload
-Optimizes, re-encodes, and uploads everything to Telegram.
-```bash
-./upload.sh --res 720 --intro
-```
-**CLI Options & Defaults:**
-- `--res 720|1080`: Target video resolution. **Default: 720**.
-- `--intro`: Adds a professional title card intro to each video. **Default: OFF**.
+### 🧩 Core Components
+1. **🔍 Scan**: Initializes the mapping of content hierarchy and metadata via `scraper.py`.
+2. **📥 Download**: Asynchronously fetches media assets into the local environment.
+3. **🚀 Upload**: A heavy-duty pipeline that handles FFmpeg re-encoding, resolution scaling, and sequential delivery to Telegram channels.
 
 ---
 
-## 🤖 Smart Indexing Features
-- **Placeholders**: If you are starting a new channel (uploading video 001), the script automatically sends 10 reserved messages at the start.
-- **Auto-ToC**: After the upload batch finishes, the system automatically updates those 10 placeholders with a clickable Table of Contents and posts a final Index at the end of the channel.
+## 🎬 Live Demo (Simulated Output)
+```text
+$ ./upload.sh --res 720 --intro
+🚀 Starting high-performance upload pipeline...
+📊 Profile: 720p HD | Intro: Enabled | Auto-Index: Active
 
-## 📁 Project Structure
-- `scripts/`: Implementation logic (Python).
-- `src/`: Shared core modules.
-- `.storage/`: Local cache, manifest, and history.
-- `temp/`: Temporary processing directory.
+[1/45] 🎞️ Processing: "001 - Introduction.mp4"
+   ├─ ⚙️ Re-encoding to 720p... [OK]
+   ├─ 🎨 Generating title card... [OK]
+   └─ 📤 Uploading to Telegram (@YourChannel)... [100%]
+✅ Success: Message ID #1052
+
+[2/45] 🎞️ Processing: "002 - Advanced Logic.mp4"
+   └─ 📤 Direct upload (already optimized)... [100%]
+✅ Success: Message ID #1053
+
+✨ Upload sequence finished.
+📝 Successfully updated Table of Contents placeholders.
+```
 
 ---
 
-## 🌟 Key Technical Highlights (For Recruiters)
-This project demonstrates several advanced software engineering concepts:
-- **Resilient Web Scraping**: Implements a modular scraping engine with session management and cookie persistence.
-- **Multithreaded Processing**: Accelerated video downloads and processing using concurrent execution.
-- **Automated Video Engineering**: Real-time re-encoding, resolution scaling, and dynamic title card generation using `FFmpeg`.
-- **Telegram Bot Integration**: Complex API interaction for automated sequential uploads and real-time caption updates.
-- **Clean Architecture**: Decoupled modules for scraping, processing, and communication.
+## 🧠 System Architecture & Capabilities
+This project serves as a showcase for robust automation and media engineering:
+
+- **Asynchronous Data Handling**: Optimized concurrency for high-speed scraping and media downloads.
+- **Media Engineering API**: A dedicated wrapper for `FFmpeg` to handle dynamic video manipulation, scaling, and intro generation.
+- **Stateful Manifest System**: A JSON-backed tracking system to ensure resume-ability and sequential integrity across large batches.
+- **Telegram Bot Protocol**: Advanced implementation of the Telegram API for automated channel management and message indexing.
+- **Modular Design**: Decoupled modules for scraping, media utilities, and delivery logic.
 
 ---
 
-**Next Steps:** Check the [Quick Start Guide](QUICK_START.md) for environment setup.
+**Next Steps:** Check the [Quick Start Guide](QUICK_START.md) for detailed environment setup.

@@ -63,6 +63,6 @@ Purpose: Help an AI coding agent become productive in this repo quickly — arch
 
 7) Quick examples to include in PRs
 - Small edit: change intro font path in `src/video_utils.py` and run `./upload_to_telegram.sh --intro --video-dir downloads` locally.
-- Add a new scraper plugin: copy `src/scrapers/site_scraper.py` template, implement `extract_links()` and register it in `scripts/smart_scraper.py`.
+- Add a new scraper plugin: copy `src/scrapers/site_scraper.py` template, implement `extract_links()` and register it in `scripts/scraper.py`.
 
 If anything here is unclear or you'd like more examples (manifest parsing, ffmpeg commands, or upload error handling), tell me which area to expand.
