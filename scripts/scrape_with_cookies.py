@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Scrape Weekend Youtuber using session/cookies from auth_cookies.json
+Scrape course structure using saved session/cookies
 """
 
 import json
@@ -76,11 +76,11 @@ def scrape_with_cookies(url, cookies_file):
         return None
 
 def main():
-    cookies_file = "/Users/su6i/@-github/telegram-video-automation/auth_cookies.json"
-    url = "https://www.contentcreator.com/products/weekend-youtuber/categories"
+    cookies_file = "auth_cookies.json"
+    url = "https://example.com/course/categories"
     
     print("=" * 80)
-    print("SCRAPING: Weekend Youtuber (using cookies)")
+    print("SCRAPING: Example Course (using cookies)")
     print("=" * 80)
     
     soup = scrape_with_cookies(url, cookies_file)

@@ -218,7 +218,7 @@ def add_intro_to_video(video_path, title, output_path):
         print(f"Error adding intro: {e}")
         return False
 
-async def process_video_for_bot_safe(input_path, output_path, title, add_intro=False):
+async def process_video_for_bot_safe(input_path, output_path, title, add_intro=False, target_res=720):
     """Process video for bot (safer version) + optional intro"""
     try:
         file_size_mb = os.path.getsize(input_path) / (1024 * 1024)
@@ -240,7 +240,10 @@ async def process_video_for_bot_safe(input_path, output_path, title, add_intro=F
             # scale=1280:720:force_original_aspect_ratio=decrease,pad=1280:720:(ow-iw)/2:(oh-ih)/2
             
             # For reliability, force both to a specific size (e.g. HD Ready)
-            target_w, target_h = 1280, 720
+            if target_res == 1080:
+                target_w, target_h = 1920, 1080
+            else:
+                target_w, target_h = 1280, 720
             
             process_cmd = [
                 "ffmpeg", "-y",
@@ -262,7 +265,10 @@ async def process_video_for_bot_safe(input_path, output_path, title, add_intro=F
                 output_path
             ]
         else:
-            print("   ⚠️ Error creating intro, continuing without intro...")
+            if target_res == 1080:
+                target_w, target_h = 1920, 1080
+            else:
+                target_w, target_h = 1280, 720
             # Fallback to normal processing
             process_cmd = [
                 "ffmpeg", "-y",
@@ -343,12 +349,12 @@ def get_video_sar(input_path):
     except:
         return 1280, 720, '1:1'
 
-async def process_video_for_user_safe(input_path, output_path, title, add_intro=False):
+async def process_video_for_user_safe(input_path, output_path, title, add_intro=False, target_res=720):
     """
-    Process video for USER ACCOUNT (always 1280x720 or 720x1280)
+    Process video for USER ACCOUNT (supports custom resolution: 720 or 1080)
     
-    نکته: این تابع فقط برای User Accounts است!
-    Bot accounts باید از process_video_for_bot_safe استفاده کنند (1280x720)
+    Note: This function is for User Accounts!
+    Bot accounts should use process_video_for_bot_safe (1280x720)
     """
     try:
         file_size_mb = os.path.getsize(input_path) / (1024 * 1024)
@@ -356,7 +362,7 @@ async def process_video_for_user_safe(input_path, output_path, title, add_intro=
         print(f"👤 Processing for user account - {title}")
         print(f"   📏 Original size: {file_size_mb:.2f}MB")
         
-        # ✅ گام 1: تشخیص aspect ratio
+        # ✅ Step 1: Detect aspect ratio
         orig_w, orig_h, sar = get_video_info_detailed(input_path)
         aspect_ratio = (orig_w / orig_h) if orig_h > 0 else 1.777
         print(f"   📐 Original: {orig_w}x{orig_h} | SAR: {sar} | Aspect: {aspect_ratio:.2f}")
@@ -364,13 +370,19 @@ async def process_video_for_user_safe(input_path, output_path, title, add_intro=
         aspect_ratio = (orig_w / orig_h) if orig_h > 0 else 1.777
         
         # ✅ USER ACCOUNT: HD (1280x720)
-        # تشخیص Portrait یا Landscape
+        # Portrait vs Landscape detection
         if aspect_ratio < 1:
-            target_w, target_h = 720, 1280  # Portrait - HD vertical
-            print(f"   🔄 Portrait detected - 720x1280")
+            if target_res == 1080:
+                target_w, target_h = 1080, 1920
+            else:
+                target_w, target_h = 720, 1280
+            print(f"   🔄 Portrait detected - {target_w}x{target_h}")
         else:
-            target_w, target_h = 1280, 720  # Landscape - HD horizontal
-            print(f"   🔄 Landscape detected - 1280x720")
+            if target_res == 1080:
+                target_w, target_h = 1920, 1080
+            else:
+                target_w, target_h = 1280, 720
+            print(f"   🔄 Landscape detected - {target_w}x{target_h}")
         
         intro_path = f"intro_user_{os.path.basename(input_path)}"
         intro_created = False
@@ -379,7 +391,7 @@ async def process_video_for_user_safe(input_path, output_path, title, add_intro=
             intro_created = create_intro_video(title, intro_path)
         
         if intro_created:
-            # ✅ با intro: Concat + Scale
+            # ✅ With intro: Concat + Scale
             process_cmd = [
                 "ffmpeg", "-y",
                 "-i", intro_path,
@@ -402,7 +414,7 @@ async def process_video_for_user_safe(input_path, output_path, title, add_intro=
                 output_path
             ]
         else:
-            # ✅ بدون intro: همچنان Scale کن!
+            # ✅ Without intro: Still Scale!
             process_cmd = [
                 "ffmpeg", "-y",
                 "-i", input_path,
@@ -489,7 +501,7 @@ def get_video_info_detailed(input_path):
     except:
         return 1280, 720, '1:1'
         
-async def split_video_for_bot_safe(input_path, output_dir, title, target_size_mb=40, add_intro=False):
+async def split_video_for_bot_safe(input_path, output_dir, title, target_size_mb=40, add_intro=False, target_res=720):
     """Split video for bot + optional intro to the first part."""
     try:
         video_info = get_video_info(input_path)
@@ -531,7 +543,10 @@ async def split_video_for_bot_safe(input_path, output_dir, title, target_size_mb
                  # [0:v] -> intro
                  # [1:v] -> video (trimmed)
                  
-                 target_w, target_h = 1280, 720
+                 if target_res == 1080:
+                     target_w, target_h = 1920, 1080
+                 else:
+                     target_w, target_h = 1280, 720
                  
                  split_cmd = [
                     "ffmpeg", "-y",
@@ -596,7 +611,7 @@ async def split_video_for_bot_safe(input_path, output_dir, title, target_size_mb
         if 'intro_path' in locals() and os.path.exists(intro_path): os.remove(intro_path)
         return []
 
-async def split_video_for_user_safe(input_path, output_dir, title, target_size_mb=1900, add_intro=False):
+async def split_video_for_user_safe(input_path, output_dir, title, target_size_mb=1900, add_intro=False, target_res=720):
     """Split video for user account if > 2GB (or 4GB for Premium)."""
     try:
         video_info = get_video_info(input_path)
@@ -630,7 +645,10 @@ async def split_video_for_user_safe(input_path, output_dir, title, target_size_m
             
             if i == 0 and intro_created:
                 # Need re-encode for concat with intro
-                target_w, target_h = 1920, 1080
+                if target_res == 1080:
+                    target_w, target_h = 1920, 1080
+                else:
+                    target_w, target_h = 1280, 720
                 split_cmd = [
                     "ffmpeg", "-y",
                     "-i", intro_path,

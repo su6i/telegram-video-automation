@@ -2,7 +2,7 @@ from PIL import Image, ImageDraw, ImageFont
 import textwrap
 import os
 
-title = "اموزش پایتون مقدماتی"
+title = "Python Basics Introduction"
 font_path = "src/fonts/Vazir-Bold.ttf"
 width, height = 1920, 1080
 background_color = (0, 0, 0)

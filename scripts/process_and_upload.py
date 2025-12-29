@@ -31,17 +31,17 @@ from src.telegram_utils import (
     decide_upload_method
 )
 from src.media_resolver import list_all_videos, find_video_file
-from src.manifest_tracker import update_manifest_status, get_pending_videos
+from src.manifest_tracker import update_manifest_status, get_pending_videos, get_all_manifest_videos
 
 # Load environment variables from root
 root_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 load_dotenv(os.path.join(root_dir, ".env"))
 
-# تنظیمات ربات
+# Bot Config
 telegram_token = os.getenv("TELEGRAM_TOKEN")
 channel_id = os.getenv("CHANNEL_ID")
 
-# تنظیمات Pyrogram
+# Pyrogram Config
 api_id = os.getenv("API_ID")
 api_hash = os.getenv("API_HASH")
 # Use CHANNEL_USERNAME if set, otherwise fallback to CHANNEL_ID
@@ -56,10 +56,11 @@ if channel_username and (channel_username.startswith('-') or channel_username.is
 
 import argparse
 
-# تنظیمات آرگومان‌ها
+# Argument Config
 parser = argparse.ArgumentParser(description="Upload videos to Telegram")
 parser.add_argument("--intro", action="store_true", help="Add intro to videos (default: False)")
 parser.add_argument("--video-dir", type=str, help="Override video directory")
+parser.add_argument("--res", type=int, choices=[720, 1080], default=720, help="Target resolution (720 or 1080, default: 720)")
 args = parser.parse_args()
 
 # Storage directory
@@ -146,7 +147,7 @@ def load_video_metadata(video_filename):
         
     return None
 
-# تنظیمات پروژه
+# Project Config
 UPLOAD_HISTORY_FILE = os.path.join(STORAGE_DIR, "upload_history.json")
 CONTENT_FILE = os.path.join(STORAGE_DIR, "scraped_content.json")
 
@@ -274,21 +275,21 @@ video_dir = args.video_dir if args.video_dir else default_video_dir
 # Use env PROCESSED_DIR if set, otherwise default to "processed"
 output_dir = os.getenv("PROCESSED_DIR", "processed")
 
-# بررسی متغیرهای محیطی
+# Environment Validation
 has_bot_creds = all([telegram_token, channel_id])
 # Now user creds needs API stuff + SOME target (username OR id)
 has_user_creds = all([api_id, api_hash]) and (channel_username or channel_id)
 
 if not has_bot_creds and not has_user_creds:
     raise ValueError("""
-❌ تنظیمات ناقص است!
-لطفاً حداقل یکی از روش‌های آپلود (ربات یا اکانت کاربری) را در فایل .env تنظیم کنید.
+❌ Incomplete configuration!
+Please set at least one upload method (Bot or User Account) in .env file.
 """)
 
 if not has_bot_creds:
-    print("⚠️ هشدار: تنظیمات ربات (TELEGRAM_TOKEN) یافت نشد. فقط امکان آپلود با اکانت کاربری وجود دارد.")
+    print("⚠️ Warning: Bot token (TELEGRAM_TOKEN) not found. Only User Account upload is possible.")
 
-# ایجاد پوشه خروجی
+# Create output directory
 if not os.path.exists(output_dir):
     os.makedirs(output_dir)
 
@@ -299,14 +300,14 @@ if not os.path.exists(video_dir):
     # os.makedirs(video_dir) # Maybe don't create it, user should provide content.
 
 async def main():
-    """پردازش و آپلود ترکیبی"""
+    """Combined Processing and Upload Flow"""
     # Initialize local flags based on global config
     bot_available = has_bot_creds
     
     processed_count = 0
     failed_count = 0
     
-    # ایجاد کلاینت Pyrogram
+    # Create Pyrogram Client
     app = None
     if has_user_creds:
         app = Client("hybrid_account", api_id=api_id, api_hash=api_hash)
@@ -314,58 +315,63 @@ async def main():
     try:
         if app:
             print("\n🚨 IMPORTANT: When asked for login, please enter your PHONE NUMBER (not Bot Token)!")
-            print("   اگر از شما شماره خواسته شد، شماره موبایل خود را وارد کنید.")
-            print("   اگر توکن ربات وارد کنید، برنامه کار نخواهد کرد.\n")
+            print("   If prompted for a phone number, please enter it.")
+            print("   If you enter a Bot Token, the program will NOT work.\n")
             
             await app.start()
             
             # Verify we are NOT a bot
             if app.me.is_bot:
-                raise ValueError("❌ شما به جای شماره موبایل، توکن ربات وارد کردید! لطفاً سشن را پاک کرده و دوباره با شماره لاگین کنید.")
+                raise ValueError("❌ You entered a Bot Token instead of a Phone Number! Please delete the session and login with your phone.")
                 
-            print(f"🔐 ورود موفق با اکانت کاربری: {app.me.first_name}")
+            print(f"🔐 Successfully logged in with user account: {app.me.first_name}")
             
             # Resolve Peer (Fix for PEER_ID_INVALID)
             # Ensure Pyrogram knows about the target channel
             if channel_username and isinstance(channel_username, int):
-                print(f"🔍 در حال شناسایی کانال {channel_username}...")
+                print(f"🔍 Identifying channel {channel_username}...")
                 try:
                     await app.get_chat(channel_username)
-                    print("✅ کانال شناسایی شد.")
+                    print("✅ Channel identified.")
                 except Exception:
-                    print("⚠️ شناسایی مستقیم ناموفق بود. جستجو در لیست گفتگوها...")
+                    print("⚠️ Direct identification failed. Searching in dialogs...")
                     found = False
                     async for dialog in app.get_dialogs():
                         if dialog.chat.id == channel_username:
                             found = True
-                            print(f"🎉 کانال در لیست گفتگوها پیدا شد: {dialog.chat.title}")
+                            print(f"🎉 Channel found in dialogs: {dialog.chat.title}")
                             break
                     
                     if not found:
-                         print("❌ هشدار: کانال در لیست شما پیدا نشد. ممکن است آپلود فیل شود.")
+                         print("❌ Warning: Channel not found in your dialogs. Upload may fail.")
         
-        # تست اتصال ربات
+        # Test Bot Connection
         if bot_available:
             try:
                 bot = Bot(token=telegram_token)
                 bot_info = await bot.get_me()
-                print(f"🤖 ربات آماده: @{bot_info.username}")
+                print(f"🤖 Bot Ready: @{bot_info.username}")
             except Exception as e:
-                print(f"⚠️ خطا در اتصال به ربات: {e}")
+                print(f"⚠️ Error connecting to bot: {e}")
                 bot_available = False # Disable bot for this run
         
-        # Scan all configured media paths instead of single video_dir
-        print(f"\n🔍 درحال اسکن تمام مسیرهای مدیا...")
-        video_files = []
-        video_paths = {}  # Map filename -> full_path
+        # 1. Scan available physical files once
+        print(f"\n🔍 Scanning all media paths...")
+        physical_videos = {} # Map index -> (filename, full_path)
         
         for filename, full_path in list_all_videos():
-            video_files.append(filename)
-            video_paths[filename] = full_path
+            idx = get_index_from_filename(filename)
+            if idx.isdigit():
+                physical_videos[idx] = (filename, full_path)
         
-        video_files.sort()  # Sort by filename (001_..., 002_...)
-        total_files = len(video_files)
-        print(f"📁 تعداد کل فایل‌های ویدیویی: {total_files}")
+        # 2. Get the master sequence from manifest
+        manifest_videos = get_all_manifest_videos()
+        if not manifest_videos:
+            print("❌ Error: Manifest is empty or not found.")
+            return
+
+        total_files = len(manifest_videos)
+        print(f"📁 Total videos defined in manifest: {total_files}")
         
         # Load history
         history_data = {}
@@ -376,17 +382,28 @@ async def main():
              except:
                  pass
 
-        for i, filename in enumerate(video_files, 1):
-            input_path = video_paths[filename]
+        # 3. Iterate through manifest sequence
+        for i, m_video in enumerate(manifest_videos, 1):
+            idx = m_video['index']
             
-            # Check history
-            idx = get_index_from_filename(filename)
-            if idx in history_data:
-                # Optional: Verify it was successful? Assume yes if in history.
-                print(f"⏩ قبلاً آپلود شده است (Skipping): {filename}")
+            # Skip if already done
+            if m_video['is_done'] or idx in history_data:
+                # print(f"⏩ {idx} already uploaded (Skipping)")
                 continue
 
-            title = get_smart_title(input_path)  # استفاده از تیتر هوشمند (الویت متادیتا)
+            # CRITICAL: Next video MUST exist
+            if idx not in physical_videos:
+                print(f"\n{'!'*60}")
+                print(f"❌ Error: File for next video ({idx}) not found!")
+                print(f"   Title: {m_video['title']}")
+                print(f"\n   ⚠️ Possible cause: The drive containing this file is not connected.")
+                print(f"   ⚠️ Program halted to maintain sequence in Telegram.")
+                print(f"{'!'*60}\n")
+                return # HALT
+
+            filename, input_path = physical_videos[idx]
+
+            title = get_smart_title(input_path)  # Use smart title (metadata preference)
             
             # Load Rich Metadata
             meta = load_video_metadata(filename)
@@ -478,14 +495,14 @@ async def main():
 
 
             print(f"\n{'='*60}")
-            print(f"[{i}/{total_files}] پردازش: {title}")
+            print(f"[{i}/{total_files}] Processing: {title}")
             print(f"📄 Generated Caption Preview:\n{caption[:200]}...")
             if meta:
                 print(f"   ℹ️ Metadata: {meta['course']} | {meta['section']}")
             print(f"{'='*60}")
             
             if not os.path.exists(input_path):
-                print(f"❌ فایل ورودی یافت نشد")
+                print(f"❌ Input file not found")
                 failed_count += 1
                 continue
             
@@ -496,7 +513,7 @@ async def main():
             
             processing_needed = True
             if os.path.exists(output_path):
-                print(f"✅ فایل پردازش شده از قبل موجود است: {output_path}")
+                print(f"✅ Pre-processed file already exists: {output_path}")
                 processing_needed = False
                 processed_files = [output_path]
                 
@@ -511,9 +528,8 @@ async def main():
             if processing_needed:
                 print(f"🔄 Processing and Compressing to 720p...")
                 
-                # Step 1: Always process & compress to 720p first
-                # This generates 'output_path' which is the 720p version
-                success = await process_video_for_user(input_path, output_path, title, add_intro=args.intro)
+                # Step 1: Always process & compress first
+                success = await process_video_for_user(input_path, output_path, title, add_intro=args.intro, target_res=args.res)
                 
                 if success and os.path.exists(output_path):
                     # Step 2: Check size of the COMPRESSED file
@@ -528,13 +544,12 @@ async def main():
                         # Split the ALREADY PROCESSED file
                         # We pass 'add_intro=False' because we already added intro in Step 1 (if any)
                         # We pass output_path as input to split
-                        processed_files = await split_video_for_user(output_path, output_dir, title, target_size_mb=USER_MAX_SIZE_MB, add_intro=False)
+                        processed_files = await split_video_for_user(output_path, output_dir, title, target_size_mb=USER_MAX_SIZE_MB, add_intro=False, target_res=args.res)
                         
                         # We can remove the big processed file since we have parts now
                         try:
                             # os.remove(output_path) # Optional: remove 720p single file to save space? 
                             # But wait, logic later cleans up 'processed_files'. 
-                            # Valid point: Keep it for simple cleanup logic later.
                             pass
                         except: pass
                     else:
@@ -554,12 +569,12 @@ async def main():
                  file_size_mb = os.path.getsize(output_path) / (1024 * 1024)
                  upload_method = decide_upload_method(file_size_mb)
                  if upload_method == 'bot' and not bot_available:
-                    print(f"ℹ️ فایل کوچک ({file_size_mb:.2f}MB) است اما ربات فعال نیست. سوییچ به اکانت کاربری.")
+                    print(f"ℹ️ File is small ({file_size_mb:.2f}MB) but bot is not enabled. Switching to User Account.")
                     upload_method = 'user'
-                 print(f"🎯 روش انتخاب شده: {'ربات' if upload_method == 'bot' else 'اکانت کاربری'}")
+                 print(f"🎯 Selected method: {'Bot' if upload_method == 'bot' else 'User Account'}")
             
             if not processed_files:
-                print(f"❌ خطا در پردازش فایل")
+                print(f"❌ Error in file processing")
                 failed_count += 1
                 continue
                 
@@ -579,7 +594,7 @@ async def main():
                      msg = await upload_with_user_account(app, f_path, caption, channel_username, thumb=thumb_path if has_thumb else None)
                      if msg:
                          processed_count += 1
-                         print(f"🎉 آپلود با اکانت کاربری موفق!")
+                         print(f"🎉 User account upload successful!")
                          # Save History & Update Manifest
                          idx = get_index_from_filename(filename)
                          save_upload_history(idx, title, msg, False)
@@ -611,7 +626,7 @@ async def main():
                      msg = await upload_with_bot(f_path, part_caption, telegram_token, channel_id, thumb=thumb_path if has_thumb else None)
                      if msg:
                          processed_count += 1
-                         print(f"🎉 آپلود با ربات موفق!")
+                         print(f"🎉 Bot upload successful!")
                          # Save History & Update Manifest
                          if j == 0:  # Only update for first part
                             idx = get_index_from_filename(filename)
@@ -639,26 +654,26 @@ async def main():
                             print(f"   🗑️ Removed: {os.path.basename(f_path)}")
                     except Exception as e:
                         print(f"   ⚠️ Cleanup failed for {f_path}: {e}")
-            # تأخیر بین ویدیوها
+            # Delay between videos
             if i < total_files:
-                delay = 120 if upload_method == "user" else 30  # تأخیر بیشتر برای اکانت کاربری
-                print(f"⏳ انتظار {delay} ثانیه...")
+                delay = 120 if upload_method == "user" else 30  # Longer delay for User Account
+                print(f"⏳ Waiting {delay} seconds...")
         
         print(f"\n{'='*60}")
-        print(f"📊 خلاصه نتایج:")
-        print(f"   📁 تعداد کل: {total_files}")
-        print(f"   ✅ موفق: {processed_count}")
-        print(f"   ❌ ناموفق: {failed_count}")
-        print(f"   📈 درصد موفقیت: {(processed_count/total_files)*100:.1f}%")
+        print(f"📊 Summary:")
+        print(f"   📁 Total: {total_files}")
+        print(f"   ✅ Successful: {processed_count}")
+        print(f"   ❌ Failed: {failed_count}")
+        print(f"   📈 Success Rate: {(processed_count/total_files)*100:.1f}%")
         print(f"{'='*60}")
         
     except KeyboardInterrupt:
-        print("\n⚠️ متوقف شد با Ctrl+C")
+        print("\n⚠️ Stopped by Ctrl+C")
     except Exception as e:
-        print(f"❌ خطای غیرمنتظره: {str(e)}")
+        print(f"❌ Unexpected Error: {str(e)}")
     finally:
         await app.stop()
-        print("🔒 اتصال بسته شد")
+        print("🔒 Connection closed")
 
 if __name__ == "__main__":
     asyncio.run(main())

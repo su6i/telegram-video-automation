@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Scrape Weekend Youtuber course structure after manual login
+Scrape course structure after manual login
 Waits for user to login, then scrapes the categories page
 """
 
@@ -105,7 +105,7 @@ def scrape_after_login(login_url, target_url):
         html_content = driver.page_source
         
         # Save raw HTML for inspection
-        html_file = "/Users/su6i/@-github/telegram-video-automation/.storage/weekend_youtuber_raw.html"
+        html_file = ".storage/raw_page_source.html"
         with open(html_file, 'w', encoding='utf-8') as f:
             f.write(html_content)
         print(f"\n✅ Raw HTML saved to: {html_file}")
@@ -152,8 +152,8 @@ def scrape_after_login(login_url, target_url):
         driver.quit()
 
 def main():
-    login_url = "https://www.contentcreator.com/login"
-    target_url = "https://www.contentcreator.com/products/weekend-youtuber/categories"
+    login_url = "https://example.com/login"
+    target_url = "https://example.com/course/curriculum"
     
     scrape_after_login(login_url, target_url)
 

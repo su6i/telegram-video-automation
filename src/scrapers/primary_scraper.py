@@ -149,7 +149,7 @@ class PrimaryScraper(BaseScraper):
         if course_url.endswith("/"): course_url = course_url[:-1]
         
         # Extract course slug to identify course
-        # e.g. https://www.contentcreator.com/products/ai-creator-course
+        # e.g. https://example.com/products/course-name
         course_slug = course_url.split("/")[-1]
         
         # User Instruction: Go DIRECTLY to categories page
@@ -181,7 +181,7 @@ class PrimaryScraper(BaseScraper):
         category_links = []
         seen_cat_urls = set()
         
-        # Specific selector for Kajabi "Momentum" or "Premier" themes usually listing categories
+        # Specific selector for generic platform themes usually listing categories
         # We look for a tags that have "/categories/" in href, but NOT invalid ones
         potential_links = soup.find_all("a", href=True)
         
@@ -252,7 +252,7 @@ class PrimaryScraper(BaseScraper):
                  course_title = title_tag.get_text(strip=True)
         if course_title == "Unknown Course" or len(course_title) > 50:
             page_title = driver.title.strip()
-            for suffix in [" | Content Creator", " - Content Creator", " | Kajabi"]:
+            for suffix in [" | Platform", " - Platform", " | Service"]:
                 page_title = page_title.replace(suffix, "")
             course_title = page_title
         return course_title
@@ -489,7 +489,7 @@ class PrimaryScraper(BaseScraper):
 
             # Pagination Logic
             next_url = None
-            # Standard Kajabi Pagination
+            # Standard Platform Pagination
             next_container = soup.select_one(".pagination, .pagination__next, a[rel='next']")
             if next_container:
                 if next_container.name == 'a':
@@ -532,10 +532,10 @@ class PrimaryScraper(BaseScraper):
         else:
             page_title = driver.title.strip()
             clean_title = page_title
-            for suffix in [" | Content Creator", " - Content Creator", " | Kajabi"]:
+            for suffix in [" | Platform", " - Platform", " | Service"]:
                 clean_title = clean_title.replace(suffix, "")
             
-            if len(clean_title) > 3 and "Content Creator" not in clean_title:
+            if len(clean_title) > 3:
                  final_title = clean_title
             else:
                  title_tag = soup.select_one("h1.post-title") or soup.select_one("span.post-title")
@@ -574,7 +574,7 @@ class PrimaryScraper(BaseScraper):
             ".user-content", 
             "#section-post_body", 
             "#post-body",
-            ".product-outline-post__text", # Kajabi specific for some themes
+            ".product-outline-post__text", # Platform specific for some themes
             ".panel__body", # Generic - risky if it contains comments
             ".panel__block",
             ".media-body"

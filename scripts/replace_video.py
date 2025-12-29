@@ -176,8 +176,8 @@ async def main():
                 
                 # Remove comments (Robust Regex)
                 # Patterns: 
-                # 1. "Comments\n123" (Kajabi standard)
-                # 2. "Post Comment" (Input field label)
+                # 1. "Comments\n123" (Platform standard)
+               # 2. "Post Comment" (Input field label)
                 # 3. "Comments\r\n"
                 # Capture everything BEFORE the first occurrence of these
                 # Look for "Comments" followed implicitly by digits or newlines, or "Post Comment"

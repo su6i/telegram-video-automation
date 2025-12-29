@@ -4,14 +4,14 @@ Debug script to check pagination issues
 """
 
 import sys
-sys.path.insert(0, '/Users/su6i/@-github/telegram-video-automation')
+sys.path.insert(0, '.')
 
 from src.scrapers.primary_scraper import PrimaryScraper
 
-print("🔍 Testing AI Creator Course pagination...\n")
+print("🔍 Testing course pagination...\n")
 
 scraper = PrimaryScraper()
-course_url = "https://ai-creator-course.kajabi.com/"
+course_url = "https://example.com/course"
 
 # Track what we find
 videos = scraper.get_video_links(limit=None)
@@ -36,8 +36,3 @@ if len(urls) != len(set(urls)):
     print(f"\n   ⚠️ WARNING: Found {len(urls) - len(set(urls))} duplicate URLs!")
 else:
     print(f"\n   ✅ No duplicates found")
-
-# Check pagination
-print(f"\n   Check if all sections are covered:")
-print(f"      - AI Video Creation should have ~11 videos")
-print(f"      - AI Video Editing should have ~8 videos")

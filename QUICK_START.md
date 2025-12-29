@@ -1,138 +1,76 @@
 # 📚 Quick Start Guide
 
-## تک‌دستور برای همه چیز
+## One Command for Everything (Automated Pipeline)
 
-### ✅ دانلود تمام منابع (Videos + Pages + Resources):
+### ✅ Full Extraction (Scan + Download + Process):
+The most efficient way to run the kit is through the provided shell scripts.
+
 ```bash
 ./download-everything.sh
 ```
 
-این یکی‌پس‌یکی انجام می‌دهد:
-1. ✅ تمام **videos** را دانلود می‌کند
-2. ✅ تمام **صفحات course** را به‌صورت HTML archive می‌کند
-3. ✅ تمام **links و descriptions** را استخراج می‌کند
+This performs the following steps sequentially:
+1. **Scans** the target platform and updates the local manifest (`.storage/downloaded_video.txt`).
+2. **Downloads** all missing videos into the `downloads/` directory.
+3. **Extracts** lesson descriptions and resource links into `.storage/scraped_content.json`.
 
 ---
 
-## ساختار نتیجه
+## Technical Architecture
+
+The system is designed with modularity to ensure stability across high-volume downloads.
 
 ```
 Project/
 ├── downloads/
-│   ├── 01_AI_Creator_Course/
-│   │   ├── 01_Course_Intro/
-│   │   │   ├── 001_Welcome.mp4
+│   ├── Course_A/
+│   │   ├── Module_1/
+│   │   │   ├── 001_Lesson_Title.mp4
 │   │   │   └── ...
 │   │   └── ...
-│   ├── 02_Ultimate_Video_Editing/
-│   ├── 03_Viral_Video_Effects/
-│   └── 04_Weekend_Youtuber/
+│   └── ...
 │
 └── .storage/
-    ├── downloaded_video.txt          # Manifest
-    ├── scraped_content.json          # Descriptions + Links
-    ├── all_links.json                # تمام resource links
-    ├── page_archives/                # HTML Pages
-    │   ├── course_intro/
-    │   │   ├── index.html
-    │   │   ├── metadata.json
-    │   │   └── images/
-    │   └── ...
-    └── descriptions/                 # Text descriptions
-        ├── Welcome.txt
-        └── ...
+    ├── downloaded_video.txt          # Manifest (Source of truth for uploads)
+    ├── scraped_content.json          # Lesson metadata, links, and descriptions
+    ├── all_links.json                # Aggregate JSON of every resource link found
+    ├── page_archives/                # Local HTML archives of lesson pages
+    └── descriptions/                 # Prepared text descriptions for Telegram
 ```
 
 ---
 
-## چه داریم؟
+## Pipeline Breakdown
 
-### 📼 Videos (در `downloads/`)
-- مرتب‌شده براساس دوره و بخش
-- فایل‌های MP4 با کیفیت بالا
-- نام‌های واضح و numbered
-
-### 📚 HTML Pages (در `.storage/page_archives/`)
-- تمام صفحات course
-- **همه تصاویر** دانلود شده
-- **تمام links** استخراج شده
-- **metadata.json** برای هرصفحه
-
-### 🔗 Resource Links (در `.storage/all_links.json`)
-- تمام download links
-- تمام resource links
-- تمام external references
-- **JSON format** برای استفاده آسان
-
-### 📝 Descriptions (در `.storage/descriptions/`)
-- متن کامل هر lesson
-- جداگانه برای هر video
-- **UTF-8** برای فارسی یا متون دیگر
-
----
-
-## مثال استفاده
-
+### Phase 1: Scanning
+Scans the site structure to find all lessons and their metadata.
 ```bash
-# Setup (یکبار)
-bash setup-permissions.sh
+./scan.sh
+```
 
-# اولین‌بار (Scan + Download)
-python scripts/smart_scraper.py --scan
-./download-everything.sh
+### Phase 2: Downloading
+Fetches the actual video files into the structured local storage.
+```bash
+./download.sh
+```
 
-# بار دوم (فقط دانلود)
-./download-everything.sh
+### Phase 3: Uploading
+Optimizes and uploads files to Telegram based on the manifest.
+```bash
+python scripts/process_and_upload.py --res 720
 ```
 
 ---
 
-## نکات مهم
+## Maintenance & Cleanup
 
-✅ **خودکار**: هر دستور قبل‌ازیاد folderهایی که نیاز دارد می‌سازد
-✅ **مرتب**: فایل‌ها براساس دوره و بخش سازمان‌دهی شده
-✅ **ایمن**: اگر فایل وجود داشت، **دوباره دانلود نمی‌کند**
-✅ **سریع**: می‌تواند چند video را **موازی** دانلود کند
-
----
-
-## پاک کردن فایل‌های دانلود شده
-
+### Resetting Downloads
 ```bash
-# حذف تمام videos
-rm -rf downloads/
-
-# حذف تمام archives
-rm -rf .storage/page_archives/
-
-# حذف resource links
-rm .storage/all_links.json
-
-# حذف descriptions
-rm -rf .storage/descriptions/
+rm -rf downloads/             # Delete all video files
+rm -rf .storage/page_archives/ # Delete HTML cache
+rm .storage/downloaded_video.txt # Reset the scan manifest
 ```
 
 ---
 
-## مشاکل متداول
-
-### ❌ "دستور پیدا نشد"
-```bash
-bash setup-permissions.sh
-./download-everything.sh
-```
-
-### ❌ "خطای Python"
-```bash
-pip install -r requirements.txt
-```
-
-### ❌ "کمیسیون دانلود" (بخشی دانلود نشد)
-```bash
-# دوباره دانلود کنید - خودکار ادامه می‌دهد
-./download-everything.sh
-```
-
----
-
-**سوالات؟** ببینید README.md یا کد script‌ها
+**Questions?** Refer to the main README.md or the script source code for detailed logic.
