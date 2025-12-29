@@ -1,6 +1,6 @@
 # 🔍 Scan & Resume Guide
 
-**Navigation:** [README](file:///Users/su6i/@-github/telegram-video-automation/README.md) | [Quick Start](file:///Users/su6i/@-github/telegram-video-automation/QUICK_START.md) | [Scan & Resume](file:///Users/su6i/@-github/telegram-video-automation/SCAN_RESUME.md)
+**Navigation:** [README](README.md) | [Quick Start](QUICK_START.md) | [Scan & Resume](SCAN_RESUME.md)
 
 ---
 
@@ -20,4 +20,4 @@ All scan results are cached in the `.storage/` directory to prevent redundant ne
 
 ---
 
-**Next Steps:** Proceed to the [Download Phase](file:///Users/su6i/@-github/telegram-video-automation/QUICK_START.md).
+**Next Steps:** Proceed to the [Download Phase](QUICK_START.md).
