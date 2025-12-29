@@ -1,0 +1,2 @@
+# Failed Downloads List
+001 | Test Video | https://test.com/video

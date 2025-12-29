@@ -1,63 +1,32 @@
 # Python
 __pycache__/
-*.py[cod]
-*$py.class
-*.so
+*.pyc
+*.pyo
+*.pyd
 .Python
-build/
-develop-eggs/
-dist/
-downloads/
-eggs/
-.eggs/
-lib/
-lib64/
-parts/
-sdist/
-var/
-wheels/
-*.egg-info/
-.installed.cfg
-*.egg
-MANIFEST
-
-# Virtual Env
-venv/
 env/
-ENV/
-.env
+venv/
+.venv/
+pip-log.txt
+pip-delete-this-directory.txt
 
-# Project Specific
-downloads/
-processed/
-mongard_videos_temp/
-videos.txt
-failed.txt
-temp_link.txt
-upload_log.json
-backup_captions.json
-video_manifest.txt
-video_manifest_bakup.txt
-debug_course_source.html
-auth_cookies.json
-
-# Telegram Sessions (Critical!)
+# Telegram Sessions & Credentials
 *.session
 *.session-journal
+.env
+auth_cookies.json
+content_creator_cookies.json
 
-# Media / Artifacts
-*.mp4
-*.mkv
-*.jpg
-*.png
-*.ass
-test_output.*
-title_preview.png
-frame_*.png
+# Tool Specific
+.storage/
+processed/
+scraped_content.json
+downloaded_video.txt
+temp_*/
+*.log
+*.tmp
+debug_*.html
 
-# macOS
+# OS
 .DS_Store
-
-# IDE
-.vscode/
-.idea/
+Thumbs.db

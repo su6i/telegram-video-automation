@@ -169,12 +169,28 @@ def create_intro_video(title, output_intro_path, font_path="src/fonts/Vazir-Bold
         print(f"❌ Error creating intro: {e}")
         return False
 
+def extract_thumbnail(video_path, output_thumb_path, timestamp="00:00:05"):
+    """Extract a thumbnail from the video at a specific timestamp."""
+    try:
+        cmd = [
+            "ffmpeg", "-y",
+            "-ss", timestamp,
+            "-i", video_path,
+            "-vframes", "1",
+            "-q:v", "2",
+            output_thumb_path
+        ]
+        subprocess.run(cmd, capture_output=True, check=True)
+        return True
+    except Exception as e:
+        print(f"⚠️ Could not extract thumbnail: {e}")
+        return False
+
 def add_intro_to_video(video_path, title, output_path):
     """Add intro to the beginning of the video."""
     intro_path = "temp_intro_video.mp4"
     temp_concat_list = "concat_list.txt"
     
-    try:
     try:
         # 1. Create intro
         if not create_intro_video(title, intro_path):
@@ -202,18 +218,20 @@ def add_intro_to_video(video_path, title, output_path):
         print(f"Error adding intro: {e}")
         return False
 
-async def process_video_for_bot_safe(input_path, output_path, title):
-    """Process video for bot (safer version) + intro"""
+async def process_video_for_bot_safe(input_path, output_path, title, add_intro=False):
+    """Process video for bot (safer version) + optional intro"""
     try:
         file_size_mb = os.path.getsize(input_path) / (1024 * 1024)
         
         print(f"🤖 Processing for bot - {title}")
         print(f"   📏 Original size: {file_size_mb:.2f}MB")
         
+        intro_created = False
         intro_path = f"intro_{os.path.basename(input_path)}"
-        
-        # Create intro
-        intro_created = create_intro_video(title, intro_path)
+
+        if add_intro:
+             # Create intro
+            intro_created = create_intro_video(title, intro_path)
         
         if intro_created:
             print("   🎞️ Intro created.")
@@ -229,9 +247,11 @@ async def process_video_for_bot_safe(input_path, output_path, title):
                 "-i", intro_path,
                 "-i", input_path,
                 "-filter_complex", 
-                f"[0:v]scale={target_w}:{target_h}:force_original_aspect_ratio=decrease,pad={target_w}:{target_h}:(ow-iw)/2:(oh-ih)/2[v0];"
-                f"[1:v]scale={target_w}:{target_h}:force_original_aspect_ratio=decrease,pad={target_w}:{target_h}:(ow-iw)/2:(oh-ih)/2[v1];"
-                f"[v0][0:a][v1][1:a]concat=n=2:v=1:a=1[outv][outa]",
+                f"[0:v]fps=25,scale={target_w}:{target_h}:force_original_aspect_ratio=decrease,pad={target_w}:{target_h}:(ow-iw)/2:(oh-ih)/2,setsar=1[v0];"
+                f"[1:v]fps=25,scale={target_w}:{target_h}:force_original_aspect_ratio=decrease,pad={target_w}:{target_h}:(ow-iw)/2:(oh-ih)/2,setsar=1[v1];"
+                f"[0:a]aresample=44100,aformat=sample_fmts=fltp:channel_layouts=stereo[a0];"
+                f"[1:a]aresample=44100,aformat=sample_fmts=fltp:channel_layouts=stereo[a1];"
+                f"[v0][a0][v1][a1]concat=n=2:v=1:a=1[outv][outa]",
                 "-map", "[outv]", "-map", "[outa]",
                 "-c:v", "libx264",
                 "-c:a", "aac",
@@ -247,7 +267,9 @@ async def process_video_for_bot_safe(input_path, output_path, title):
             process_cmd = [
                 "ffmpeg", "-y",
                 "-i", input_path,
+                "-vf", f"fps=25,scale={target_w}:{target_h}:force_original_aspect_ratio=decrease,pad={target_w}:{target_h}:(ow-iw)/2:(oh-ih)/2,setsar=1",
                 "-c:v", "libx264",
+                "-af", "aresample=44100,aformat=sample_fmts=fltp:channel_layouts=stereo",
                 "-c:a", "aac",
                 "-preset", "medium",
                 "-crf", "23",
@@ -284,80 +306,191 @@ async def process_video_for_bot_safe(input_path, output_path, title):
         #if os.path.exists(intro_path): os.remove(intro_path)
         return False
 
-async def process_video_for_user_safe(input_path, output_path, title):
-    """Process video for user account (with intro)"""
+def get_video_sar(input_path):
+    """Extract aspect ratio information, accounting for rotation."""
+    try:
+        cmd = [
+            "ffprobe", "-v", "error",
+            "-select_streams", "v:0",
+            "-show_entries", "stream=width,height,sample_aspect_ratio:stream_tags=rotate",
+            "-of", "json",
+            input_path
+        ]
+        result = subprocess.run(cmd, capture_output=True, text=True, timeout=30)
+        data = json.loads(result.stdout)
+        
+        if data['streams']:
+            stream = data['streams'][0]
+            width = int(stream.get('width', 1280))
+            height = int(stream.get('height', 720))
+            sar = stream.get('sample_aspect_ratio', '1:1')
+            
+            # Check for rotation
+            tags = stream.get('tags', {})
+            rotate = tags.get('rotate', '0')
+            try:
+                rotate = int(rotate)
+            except:
+                rotate = 0
+                
+            # If rotated 90 or 270 degrees, swap width and height
+            if abs(rotate) == 90 or abs(rotate) == 270:
+                width, height = height, width
+                
+            return width, height, sar
+            
+        return 1280, 720, '1:1'
+    except:
+        return 1280, 720, '1:1'
+
+async def process_video_for_user_safe(input_path, output_path, title, add_intro=False):
+    """
+    Process video for USER ACCOUNT (always 1280x720 or 720x1280)
+    
+    نکته: این تابع فقط برای User Accounts است!
+    Bot accounts باید از process_video_for_bot_safe استفاده کنند (1280x720)
+    """
     try:
         file_size_mb = os.path.getsize(input_path) / (1024 * 1024)
         
         print(f"👤 Processing for user account - {title}")
         print(f"   📏 Original size: {file_size_mb:.2f}MB")
         
+        # ✅ گام 1: تشخیص aspect ratio
+        orig_w, orig_h, sar = get_video_info_detailed(input_path)
+        aspect_ratio = (orig_w / orig_h) if orig_h > 0 else 1.777
+        print(f"   📐 Original: {orig_w}x{orig_h} | SAR: {sar} | Aspect: {aspect_ratio:.2f}")
+        
+        aspect_ratio = (orig_w / orig_h) if orig_h > 0 else 1.777
+        
+        # ✅ USER ACCOUNT: HD (1280x720)
+        # تشخیص Portrait یا Landscape
+        if aspect_ratio < 1:
+            target_w, target_h = 720, 1280  # Portrait - HD vertical
+            print(f"   🔄 Portrait detected - 720x1280")
+        else:
+            target_w, target_h = 1280, 720  # Landscape - HD horizontal
+            print(f"   🔄 Landscape detected - 1280x720")
+        
         intro_path = f"intro_user_{os.path.basename(input_path)}"
-        intro_created = create_intro_video(title, intro_path)
+        intro_created = False
+        
+        if add_intro:
+            intro_created = create_intro_video(title, intro_path)
         
         if intro_created:
-             # Higher quality for user account (1920x1080)
-            target_w, target_h = 1920, 1080
-            
-            # Note: If original video has no audio, concat might fail?
-            # We added silent audio in create_intro_video.
-            # Tutorial videos usually have audio.
-            
+            # ✅ با intro: Concat + Scale
             process_cmd = [
                 "ffmpeg", "-y",
                 "-i", intro_path,
                 "-i", input_path,
                 "-filter_complex", 
-                f"[0:v]scale={target_w}:{target_h}:force_original_aspect_ratio=decrease,pad={target_w}:{target_h}:(ow-iw)/2:(oh-ih)/2[v0];"
-                f"[1:v]scale={target_w}:{target_h}:force_original_aspect_ratio=decrease,pad={target_w}:{target_h}:(ow-iw)/2:(oh-ih)/2[v1];"
-                f"[v0][0:a][v1][1:a]concat=n=2:v=1:a=1[outv][outa]",
+                f"[0:v]fps=25,scale={target_w}:{target_h}:force_original_aspect_ratio=decrease,"
+                f"pad={target_w}:{target_h}:(ow-iw)/2:(oh-ih)/2,setsar=1[v0];"
+                f"[1:v]fps=25,scale={target_w}:{target_h}:force_original_aspect_ratio=decrease,"
+                f"pad={target_w}:{target_h}:(ow-iw)/2:(oh-ih)/2,setsar=1[v1];"
+                f"[0:a]aresample=44100,aformat=sample_fmts=fltp:channel_layouts=stereo[a0];"
+                f"[1:a]aresample=44100,aformat=sample_fmts=fltp:channel_layouts=stereo[a1];"
+                f"[v0][a0][v1][a1]concat=n=2:v=1:a=1[outv][outa]",
                 "-map", "[outv]", "-map", "[outa]",
-                "-c:v", "libx264", # Re-encoding is mandatory for concat filter
+                "-c:v", "libx264",
                 "-c:a", "aac",
-                "-preset", "medium", # Faster
+                "-preset", "medium",
                 "-crf", "23",
                 "-pix_fmt", "yuv420p",
                 "-movflags", "+faststart",
                 output_path
             ]
         else:
-             # If intro failed, just copy (like before)
+            # ✅ بدون intro: همچنان Scale کن!
             process_cmd = [
                 "ffmpeg", "-y",
                 "-i", input_path,
-                "-c", "copy",
+                "-vf", (
+                    f"fps=25,scale={target_w}:{target_h}:force_original_aspect_ratio=decrease,"
+                    f"pad={target_w}:{target_h}:(ow-iw)/2:(oh-ih)/2,setsar=1"
+                ),
+                "-c:v", "libx264",
+                "-af", "aresample=44100,aformat=sample_fmts=fltp:channel_layouts=stereo",
+                "-c:a", "aac",
+                "-preset", "medium",
+                "-crf", "23",
+                "-pix_fmt", "yuv420p",
                 "-movflags", "+faststart",
                 output_path
             ]
             
+        # Using stdout=None to allow ffmpeg progress bar to show in terminal
         result = subprocess.run(
             process_cmd, 
-            capture_output=True, 
-            text=True,
-            timeout=1800  # 30 minutes
+            stdout=None, 
+            stderr=None,
+            timeout=1800
         )
         
         if intro_created and os.path.exists(intro_path):
             os.remove(intro_path)
         
         if result.returncode != 0:
-            print(f"   ❌ ffmpeg error (code {result.returncode}):")
-            print(f"   📝 stderr: {result.stderr[-300:]}")
+            print(f"   ❌ ffmpeg error (code {result.returncode})")
             return False
         
         if os.path.exists(output_path) and os.path.getsize(output_path) > 1000:
             new_size = os.path.getsize(output_path) / (1024 * 1024)
-            print(f"   ✅ Processing successful - Size: {new_size:.2f}MB")
+            final_w, final_h, _ = get_video_info_detailed(output_path)
+            print(f"   ✅ Success - Size: {new_size:.2f}MB, Final: {final_w}x{final_h}")
             return True
         
         return False
         
+    except subprocess.TimeoutExpired:
+        print(f"   ❌ Processing timeout (30 minutes exceeded)")
+        return False
     except Exception as e:
         print(f"   ❌ Processing error: {str(e)}")
         return False
 
-async def split_video_for_bot_safe(input_path, output_dir, title, target_size_mb=40):
-    """Split video for bot + add intro to the first part."""
+
+def get_video_info_detailed(input_path):
+    """
+    Extract width, height, SAR for valid scaling.
+    Includes ROTATION check to correctly identify landscape videos stored vertically.
+    """
+    try:
+        cmd = [
+            "ffprobe", "-v", "error",
+            "-select_streams", "v:0",
+            "-show_entries", "stream=width,height,sample_aspect_ratio:stream_tags=rotate",
+            "-of", "json",
+            input_path
+        ]
+        result = subprocess.run(cmd, capture_output=True, text=True, timeout=30)
+        data = json.loads(result.stdout)
+        
+        if data['streams']:
+            stream = data['streams'][0]
+            w = int(stream.get('width', 1280))
+            h = int(stream.get('height', 720))
+            sar = stream.get('sample_aspect_ratio', '1:1')
+            
+            # Rotation Check (Critical for phone videos)
+            tags = stream.get('tags', {})
+            rotate = tags.get('rotate', '0')
+            try:
+                rotate = int(rotate)
+            except:
+                rotate = 0
+            
+            if abs(rotate) == 90 or abs(rotate) == 270:
+                w, h = h, w
+                
+            return w, h, sar
+        return 1280, 720, '1:1'
+    except:
+        return 1280, 720, '1:1'
+        
+async def split_video_for_bot_safe(input_path, output_dir, title, target_size_mb=40, add_intro=False):
+    """Split video for bot + optional intro to the first part."""
     try:
         video_info = get_video_info(input_path)
         if not video_info or video_info['duration'] <= 0:
@@ -373,8 +506,11 @@ async def split_video_for_bot_safe(input_path, output_dir, title, target_size_mb
         output_files = []
         
         # Create main intro once
+        intro_created = False
         intro_path = f"intro_split_{os.path.basename(input_path)}"
-        intro_created = create_intro_video(title, intro_path)
+
+        if add_intro:
+             intro_created = create_intro_video(title, intro_path)
         
         for i in range(segments):
             start_time = i * segment_duration
@@ -404,9 +540,11 @@ async def split_video_for_bot_safe(input_path, output_dir, title, target_size_mb
                     "-i", input_path,
                     "-t", str(segment_duration), # duration from seek point
                     "-filter_complex",
-                    f"[0:v]scale={target_w}:{target_h}:force_original_aspect_ratio=decrease,pad={target_w}:{target_h}:(ow-iw)/2:(oh-ih)/2[v0];"
-                    f"[1:v]scale={target_w}:{target_h}:force_original_aspect_ratio=decrease,pad={target_w}:{target_h}:(ow-iw)/2:(oh-ih)/2[v1];"
-                    f"[v0][0:a][v1][1:a]concat=n=2:v=1:a=1[outv][outa]",
+                    f"[0:v]fps=25,scale={target_w}:{target_h}:force_original_aspect_ratio=decrease,pad={target_w}:{target_h}:(ow-iw)/2:(oh-ih)/2,setsar=1[v0];"
+                    f"[1:v]fps=25,scale={target_w}:{target_h}:force_original_aspect_ratio=decrease,pad={target_w}:{target_h}:(ow-iw)/2:(oh-ih)/2,setsar=1[v1];"
+                    f"[0:a]aresample=44100,aformat=sample_fmts=fltp:channel_layouts=stereo[a0];"
+                    f"[1:a]aresample=44100,aformat=sample_fmts=fltp:channel_layouts=stereo[a1];"
+                    f"[v0][a0][v1][a1]concat=n=2:v=1:a=1[outv][outa]",
                     "-map", "[outv]", "-map", "[outa]",
                     "-c:v", "libx264",
                     "-c:a", "aac",
@@ -456,6 +594,94 @@ async def split_video_for_bot_safe(input_path, output_dir, title, target_size_mb
     except Exception as e:
         print(f"❌ Error during split: {str(e)}")
         if 'intro_path' in locals() and os.path.exists(intro_path): os.remove(intro_path)
+        return []
+
+async def split_video_for_user_safe(input_path, output_dir, title, target_size_mb=1900, add_intro=False):
+    """Split video for user account if > 2GB (or 4GB for Premium)."""
+    try:
+        video_info = get_video_info(input_path)
+        if not video_info or video_info['duration'] <= 0:
+            return []
+        
+        file_size_mb = os.path.getsize(input_path) / (1024 * 1024)
+        duration = video_info['duration']
+        # Calculate segments (use same logic but with larger target)
+        segments = math.ceil(file_size_mb / (target_size_mb * 0.95))
+        
+        if segments <= 1:
+            return [] # No split needed
+            
+        print(f"✂️ Splitting for user account into {segments} parts...")
+        
+        segment_duration = duration / segments
+        output_files = []
+        
+        intro_created = False
+        intro_path = f"intro_user_split_{os.path.basename(input_path)}"
+        if add_intro:
+            intro_created = create_intro_video(title, intro_path)
+            
+        for i in range(segments):
+            start_time = i * segment_duration
+            safe_title = re.sub(r'[^\w\-_\s]', '_', title)
+            output_path = os.path.join(output_dir, f"{safe_title}_part{i+1:02d}.mp4")
+            
+            print(f"   📹 Part {i+1}/{segments}...")
+            
+            if i == 0 and intro_created:
+                # Need re-encode for concat with intro
+                target_w, target_h = 1920, 1080
+                split_cmd = [
+                    "ffmpeg", "-y",
+                    "-i", intro_path,
+                    "-ss", str(start_time),
+                    "-i", input_path,
+                    "-t", str(segment_duration),
+                    "-filter_complex",
+                    f"[0:v]fps=25,scale={target_w}:{target_h}:force_original_aspect_ratio=decrease,pad={target_w}:{target_h}:(ow-iw)/2:(oh-ih)/2,setsar=1[v0];"
+                    f"[1:v]fps=25,scale={target_w}:{target_h}:force_original_aspect_ratio=decrease,pad={target_w}:{target_h}:(ow-iw)/2:(oh-ih)/2,setsar=1[v1];"
+                    f"[0:a]aresample=44100,aformat=sample_fmts=fltp:channel_layouts=stereo[a0];"
+                    f"[1:a]aresample=44100,aformat=sample_fmts=fltp:channel_layouts=stereo[a1];"
+                    f"[v0][a0][v1][a1]concat=n=2:v=1:a=1[outv][outa]",
+                    "-map", "[outv]", "-map", "[outa]",
+                    "-c:v", "libx264",
+                    "-c:a", "aac",
+                    "-preset", "medium",
+                    "-crf", "23",
+                    "-movflags", "+faststart",
+                    output_path
+                ]
+            else:
+                # Try "copy" for faster results if no intro needed
+                # Accurate splitting with copy (-ss before -i)
+                split_cmd = [
+                    "ffmpeg", "-y",
+                    "-ss", str(start_time),
+                    "-i", input_path,
+                    "-t", str(segment_duration),
+                    "-c", "copy",
+                    "-movflags", "+faststart",
+                    output_path
+                ]
+            
+            try:
+                result = subprocess.run(split_cmd, capture_output=True, text=True, timeout=600)
+                if result.returncode == 0 and os.path.exists(output_path) and os.path.getsize(output_path) > 1000:
+                    part_size = os.path.getsize(output_path) / (1024 * 1024)
+                    print(f"   ✅ Part {i+1} ready - {part_size:.2f}MB")
+                    output_files.append(output_path)
+                else:
+                    print(f"   ❌ Error in part {i+1}: {result.stderr[-200:] if result.stderr else 'unknown'}")
+            except Exception as e:
+                print(f"   ❌ Error in part {i+1}: {str(e)}")
+        
+        if intro_created and os.path.exists(intro_path):
+            os.remove(intro_path)
+            
+        return output_files
+        
+    except Exception as e:
+        print(f"❌ Error during user split: {str(e)}")
         return []
 
 def normalize_title(title):
