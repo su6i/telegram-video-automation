@@ -665,7 +665,7 @@ def _update_progress(d, pbar):
         pbar.refresh()
 
 def main():
-    parser = argparse.ArgumentParser(description="Content Creator Smart Scraper")
+    parser = argparse.ArgumentParser(description="Generic Course Smart Scraper")
     parser.add_argument("--scan", action="store_true", help="Scan site and update manifest")
     parser.add_argument("--download", action="store_true", help="Download videos from manifest")
     parser.add_argument("--force", action="store_true", help="Force download even if file exists")

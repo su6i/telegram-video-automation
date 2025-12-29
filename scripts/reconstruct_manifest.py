@@ -12,17 +12,17 @@ def _norm_url(url):
     if not url: return ""
     url = url.strip().lower()
     
-    # 1. Handle Wistia iframes: https://fast.wistia.net/embed/iframe/ID or https://contentcreator.wistia.net/embed/iframe/ID
+    # 1. Handle External iframes: https://fast.vimeo.net/embed/iframe/ID or https://example.wistia.net/embed/iframe/ID
     if "wistia.net/embed/iframe/" in url:
         return url.split("embed/iframe/")[-1].split("?")[0].strip("/")
         
-    # 2. Handle ContentCreator lesson URLs: .../posts/ID -> ID
+    # 2. Handle Platform specific lesson URLs: .../posts/ID -> ID
     if "/posts/" in url:
         return url.split("/")[-1].split("?")[0].strip("/")
         
     # fallback to relative path without domain
-    url = url.replace("https://www.contentcreator.com", "")
-    url = url.replace("http://www.contentcreator.com", "")
+    url = url.replace("https://www.example.com", "")
+    url = url.replace("http://www.example.com", "")
     if url.endswith("/"): url = url[:-1]
     return url
 

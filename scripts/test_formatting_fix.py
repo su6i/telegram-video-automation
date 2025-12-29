@@ -9,7 +9,7 @@ from webdriver_manager.chrome import ChromeDriverManager
 from src.scrapers.primary_scraper import PrimaryScraper
 
 # Video 6 URL (Craft Better PROMPTS)
-TARGET_URL = "https://www.contentcreator.com/products/ai-creator-course/categories/2157412656/posts/2186653205"
+TARGET_URL = "https://example.com/course/lesson"
 STORAGE_FILE = ".storage/scraped_content.json"
 
 def main():

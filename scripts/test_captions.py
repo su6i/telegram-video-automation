@@ -35,16 +35,16 @@ def format_caption(meta, extra):
     return caption
 
 # Mock Data
-meta_005 = {"course": "AI Creator Course", "section": "Intro to AI", "index": "005", "line_title": "ChatGPT Overview", "title": "ChatGPT Overview"}
+meta_005 = {"course": "Example Masterclass", "section": "Getting Started", "index": "005", "line_title": "Overview Lesson", "title": "Overview Lesson"}
 extra_005 = {
-    "links": [{"text": "chat.openai.com", "url": "https://chat.openai.com/"}],
-    "description": "ChatGPT Overview\n12/25 Update! Personalization settings..."
+    "links": [{"text": "example.com", "url": "https://example.com/"}],
+    "description": "Overview Lesson\n12/25 Update! Important notes..."
 }
 
-meta_006 = {"course": "AI Creator Course", "section": "Intro to AI", "index": "006", "line_title": "Video 6", "title": "Video 6"}
+meta_006 = {"course": "Example Masterclass", "section": "Getting Started", "index": "006", "line_title": "Deep Dive", "title": "Deep Dive"}
 extra_006 = {
     "links": [],
-    "description": "Cool Video Info\nComments\n123\nPost Comment\nUser: Nice video!\nREPLY"
+    "description": "Technical details\nComments\n123\nPost Comment\nUser: Great info!\nREPLY"
 }
 
 print("--- VIDEO 005 CAPTION ---")

@@ -7,5 +7,4 @@ webdriver-manager
 beautifulsoup4
 requests
 ffmpeg-python
-moviepy
 Pillow

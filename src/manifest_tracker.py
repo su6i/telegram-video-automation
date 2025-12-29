@@ -163,3 +163,53 @@ def get_failed_videos():
         pass
     
     return failed
+
+
+def get_all_manifest_videos():
+    """Get all videos defined in manifest in their listed order."""
+    if not os.path.exists(MANIFEST_FILE):
+        return []
+    
+    videos = []
+    try:
+        current_course = "Unknown Course"
+        current_section = "General"
+        
+        with open(MANIFEST_FILE, "r", encoding="utf-8") as f:
+            for line in f:
+                line = line.strip()
+                if not line: continue
+                
+                if line.startswith("# === "):
+                    current_course = line.replace("# === ", "").split(" ===")[0].split("(")[0].strip()
+                    current_section = "General"
+                elif line.startswith("## --- "):
+                    current_section = line.replace("## --- ", "").replace(" ---", "").strip()
+                elif "|" in line:
+                    clean_line = line.replace("# [DONE] ", "").strip()
+                    parts = [p.strip() for p in clean_line.split("|")]
+                    if len(parts) >= 2:
+                        # Extract index from parts[0] which might be "001" or "001_Title"
+                        idx_match = re.match(r'^(\d{3})', parts[0])
+                        if idx_match:
+                            index = idx_match.group(1)
+                            # Title logic
+                            if "_" in parts[0] and len(parts[0]) > 4:
+                                title = parts[0][4:].strip()
+                            else:
+                                title = parts[1] if len(parts) >= 2 else ""
+                            
+                            url = parts[1] if "_" in parts[0] else (parts[2] if len(parts) >= 3 else "")
+                            
+                            videos.append({
+                                'index': index,
+                                'title': title,
+                                'url': url,
+                                'course': current_course,
+                                'section': current_section,
+                                'is_done': "# [DONE]" in line or "UPLOADED" in line
+                            })
+    except Exception as e:
+        print(f"⚠️ Error reading manifest sequence: {e}")
+        
+    return videos

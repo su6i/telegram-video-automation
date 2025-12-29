@@ -29,7 +29,7 @@ class SiteScraper(BaseScraper):
             print(message)
 
     def get_video_links(self, limit: int = None) -> list:
-        """Scrapes all video links from Mongard."""
+        """Scrapes all video links from the target site."""
         subpage_links = self._get_subpage_links()
         if not subpage_links:
             self._log("No subpages found!")
@@ -115,7 +115,7 @@ class SiteScraper(BaseScraper):
             soup = BeautifulSoup(driver.page_source, "html.parser")
 
             title_tag = soup.find("h1", class_="blog-title")
-            title = title_tag.text.strip().replace("ویدیو ", "") if title_tag else "unknown_video"
+            title = title_tag.text.strip().replace("Video ", "") if title_tag else "unknown_video"
 
             # Extract Date from JSON-LD
             json_ld = soup.find("script", type="application/ld+json")

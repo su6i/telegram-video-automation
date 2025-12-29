@@ -12,7 +12,7 @@ from selenium.webdriver.chrome.options import Options
 from dotenv import load_dotenv
 load_dotenv()
 
-TARGET_URL = os.getenv("TARGET_SITE_BASE_URL", "https://www.contentcreator.com") + "/login"
+TARGET_URL = os.getenv("TARGET_SITE_BASE_URL", "https://example.com") + "/login"
 COOKIES_FILE = "auth_cookies.json"
 
 def main():

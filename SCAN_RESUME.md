@@ -1,67 +1,51 @@
 # Scan & Resume Guide
 
-## خصوصیات
+## Core Logic
 
-✅ **Incremental Scanning**: اگر manifest قبلی وجود دارد، تنها ویدیوهای جدید اسکن می‌شوند.
-✅ **No Limit by Default**: بدون محدودیت، **تمام** ویدیوها اسکن می‌شوند.
-✅ **Optional Limit**: می‌توان برای تست با `--limit N` محدود کرد.
+The scanning engine is designed for efficiency and safety. It creates a "snapshot" of the remote site's structure without redundant scraping.
 
-## استفاده
+### Features
+✅ **Incremental Scanning**: Compares remote lesson IDs with the local manifest entries. Only new lessons are parsed and appended.
+✅ **Full Trace**: Every lesson is attributed to a specific module (Section) and course, maintaining the original hierarchy.
+✅ **Safe Metadata**: Downloads and caches HTML source for lesson pages for offline processing of resources.
 
-### اسکن کامل (اولین بار)
-```bash
-./scan.sh
-```
-⏱️ **مدت**: 10-15 دقیقه برای 85 ویدیو
+---
 
-### اسکن Incremental (ویدیوهای جدید)
-```bash
-./scan.sh
-```
-✅ دوباره اجرا می‌کند و تنها ویدیوهای جدید اضافه می‌کند
+## Detailed Operation
 
-### برای تست (محدود به 10 ویدیو)
-```bash
-./scan.sh --limit 10
-```
-
-### برای تست دوباره (بدون محدودیت)
+### 1. Initial Scan
+Builds the complete library manifest for the first time.
 ```bash
 ./scan.sh
 ```
 
-## چه اتفاقی می‌افتد؟
-
-**اول (run 1):**
-```
-📋 Found 0 existing videos in manifest
-✅ Found 85 NEW videos (0 + 85 = 85 total).
-```
-
-**دوم (run 2 - اگر ویدیوهای جدید اضافه شده باشند):**
-```
-📋 Found 85 existing videos in manifest
-✅ Found 3 NEW videos (85 + 3 = 88 total).
-```
-
-**اگر نیچ نو ویدیو نیست:**
-```
-📋 Found 85 existing videos in manifest
-✅ Scan complete. 85 total videos in library.
-```
-
-## دانلود
-
+### 2. New Content Discovery
+Run this whenever you want to check for new course updates.
 ```bash
-./download.sh
+./scan.sh --scan
 ```
+- **Scenario**: You had 85 videos, 5 new ones were released.
+- **Output**: 
+  ```
+  📋 Found 85 existing videos in manifest
+  ✅ Found 5 NEW videos (85 + 5 = 90 total).
+  ```
 
-📁 تمام ویدیوها در `downloads/Course/Section/` دانلود می‌شوند.
-
-## Upload
-
+### 3. Verification & Testing
+Target a specific amount of content for debugging purposes.
 ```bash
-./upload_to_telegram.sh --intro
+./scan.sh --limit 5
 ```
 
-🎥 ویدیوها به تلگرام آپلود می‌شوند.
+---
+
+## Execution Pipeline
+
+After scanning, the subsequent steps are:
+
+1. **Download**: `bash download.sh` fetches the physical media.
+2. **Process & Upload**: `python3 scripts/process_and_upload.py` encodes and distributes to Telegram.
+
+---
+
+**Note**: All scan status and logs are kept in the `.storage/` directory. If you manually edit the manifest file, ensure you maintain the pipe-delimited (`|`) format to avoid parsing errors.

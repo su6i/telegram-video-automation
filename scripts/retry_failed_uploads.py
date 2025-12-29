@@ -28,76 +28,76 @@ from src.telegram_utils import (
     decide_upload_method
 )
 
-# لود متغیرهای محیطی از .env
+# Load environment variables from .env
 load_dotenv()
 
-# تنظیمات ربات
+# Bot Config
 telegram_token = os.getenv("TELEGRAM_TOKEN")
 channel_id = os.getenv("CHANNEL_ID")
 
-# تنظیمات Pyrogram
+# Pyrogram Config
 api_id = os.getenv("API_ID")
 api_hash = os.getenv("API_HASH")
 channel_username = os.getenv("CHANNEL_USERNAME")
 
-# تنظیمات
+# Additional Config
 processed_dir = "processed"
 json_log_file = "upload_log.json"
 
-# بررسی متغیرهای محیطی
+# Environment Validation
 required_vars = [telegram_token, channel_id, api_id, api_hash, channel_username]
 if not all(required_vars):
     raise ValueError("""
-لطفاً متغیرهای زیر را در فایل .env تنظیم کنید:
-- TELEGRAM_TOKEN (برای ربات)
-- CHANNEL_ID (برای ربات)  
-- API_ID (برای اکانت کاربری)
-- API_HASH (برای اکانت کاربری)
-- CHANNEL_USERNAME (برای اکانت کاربری - مثل @mychannel)
+Please set the following variables in .env:
+- TELEGRAM_TOKEN (for Bot)
+- CHANNEL_ID (for Bot)  
+- API_ID (for User Account)
+- API_HASH (for User Account)
+- CHANNEL_USERNAME (for User Account - e.g. @mychannel)
 """)
 
-# ایجاد پوشه خروجی
+# Create output directory
 if not os.path.exists(output_dir):
     os.makedirs(output_dir)
 
 async def get_channel_videos(app):
-    """دریافت لیست ویدیوهای موجود در کانال"""
+    """Retrieve list of existing videos in the channel"""
     try:
-        print("📋 دریافت لیست ویدیوهای کانال...")
+        print("📋 Fetching channel video list...")
         
         uploaded_videos = set()
         message_count = 0
         
-        # دریافت پیام‌های کانال (آخرین 1000 پیام)
+        # Get channel messages (last 1000 messages)
         async for message in app.get_chat_history(channel_username, limit=1000):
             message_count += 1
             
             if message.video and message.caption:
-                # نرمال‌سازی عنوان
+                # Caption normalization
                 normalized_caption = normalize_title(message.caption)
                 uploaded_videos.add(normalized_caption)
                 
-                # بررسی قسمت‌های مختلف (برای ویدیوهای تقسیم شده)
-                if " - قسمت " in message.caption:
-                    base_title = message.caption.split(" - قسمت ")[0]
+                # Check parts (for split videos)
+                if " - Part " in message.caption:
+                    base_title = message.caption.split(" - Part ")[0]
                     normalized_base = normalize_title(base_title)
                     uploaded_videos.add(normalized_base)
             
-            # نمایش پیشرفت
+            # Progress reporting
             if message_count % 100 == 0:
-                print(f"   📊 بررسی شده: {message_count} پیام")
+                print(f"   📊 Checked: {message_count} messages")
         
-        print(f"✅ تعداد ویدیوهای یافت شده در کانال: {len(uploaded_videos)}")
-        print(f"📊 تعداد کل پیام‌های بررسی شده: {message_count}")
+        print(f"✅ Videos found in channel: {len(uploaded_videos)}")
+        print(f"📊 Total messages checked: {message_count}")
         
         return uploaded_videos
         
     except Exception as e:
-        print(f"❌ خطا در دریافت لیست کانال: {str(e)}")
+        print(f"❌ Error fetching channel list: {str(e)}")
         return set()
 
 def get_local_videos():
-    """دریافت لیست ویدیوهای محلی"""
+    """Retrieve local video list"""
     try:
         video_files = []
         for filename in os.listdir(video_dir):
@@ -112,25 +112,25 @@ def get_local_videos():
                     'size_mb': os.path.getsize(os.path.join(video_dir, filename)) / (1024 * 1024)
                 })
         
-        print(f"📁 تعداد فایل‌های محلی: {len(video_files)}")
+        print(f"📁 Local files found: {len(video_files)}")
         return video_files
         
     except Exception as e:
-        print(f"❌ خطا در خواندن فایل‌های محلی: {str(e)}")
+        print(f"❌ Error reading local files: {str(e)}")
         return []
 
 def find_missing_videos(local_videos, uploaded_videos):
-    """یافتن ویدیوهای آپلود نشده"""
+    """Find videos that are not yet uploaded"""
     missing_videos = []
     
     for video in local_videos:
         if video['normalized_title'] not in uploaded_videos:
             missing_videos.append(video)
             
-    print(f"🔍 ویدیوهای آپلود نشده: {len(missing_videos)}")
+    print(f"🔍 Missing videos: {len(missing_videos)}")
     
     if missing_videos:
-        print("\n📝 لیست ویدیوهای آپلود نشده:")
+        print("\n📝 List of missing videos:")
         for i, video in enumerate(missing_videos, 1):
             print(f"   {i:2d}. {video['title']} ({video['size_mb']:.1f}MB)")
     
@@ -138,56 +138,56 @@ def find_missing_videos(local_videos, uploaded_videos):
 
 
 async def retry_failed_uploads():
-    """آپلود مجدد فایل‌های ناموفق"""
+    """Retry uploading failed/missing files"""
     processed_count = 0
     failed_count = 0
     
-    # ایجاد کلاینت Pyrogram
+    # Create Pyrogram client
     app = Client("hybrid_account", api_id=api_id, api_hash=api_hash)
     
     try:
         await app.start()
-        print("🔐 ورود موفق با اکانت کاربری")
+        print("🔐 Successfully logged in with user account")
         
-        # تست اتصال ربات
+        # Test Bot Connection
         bot = Bot(token=telegram_token)
         bot_info = await bot.get_me()
-        print(f"🤖 ربات آماده: @{bot_info.username}")
+        print(f"🤖 Bot Ready: @{bot_info.username}")
         
-        # مرحله 1: دریافت لیست ویدیوهای کانال
+        # Phase 1: Get channel video list
         uploaded_videos = await get_channel_videos(app)
         
-        # مرحله 2: دریافت لیست فایل‌های محلی
+        # Phase 2: Get local video list
         local_videos = get_local_videos()
         
-        # مرحله 3: یافتن فایل‌های آپلود نشده
+        # Phase 3: Find missing videos
         missing_videos = find_missing_videos(local_videos, uploaded_videos)
         
         if not missing_videos:
-            print("🎉 همه فایل‌ها قبلاً آپلود شده‌اند!")
+            print("🎉 All files are already uploaded!")
             return
         
-        print(f"\n🔄 شروع آپلود مجدد {len(missing_videos)} فایل...")
+        print(f"\n🔄 Starting retry for {len(missing_videos)} files...")
         
-        # مرحله 4: آپلود فایل‌های باقی‌مانده
+        # Phase 4: Upload remaining files
         for i, video in enumerate(missing_videos, 1):
             title = video['title']
             input_path = video['path']
             file_size_mb = video['size_mb']
             
             print(f"\n{'='*60}")
-            print(f"[{i}/{len(missing_videos)}] آپلود مجدد: {title}")
+            print(f"[{i}/{len(missing_videos)}] Retrying: {title}")
             print(f"{'='*60}")
             
             upload_method = decide_upload_method(file_size_mb)
             
-            print(f"📊 اندازه فایل: {file_size_mb:.2f}MB")
-            print(f"🎯 روش انتخاب شده: {'ربات' if upload_method == 'bot' else 'اکانت کاربری'}")
+            print(f"📊 File Size: {file_size_mb:.2f}MB")
+            print(f"🎯 Selected method: {'Bot' if upload_method == 'bot' else 'User Account'}")
             
             if upload_method == "bot":
-                # استفاده از ربات
+                # Using Bot
                 if file_size_mb <= SIZE_THRESHOLD_MB:
-                    # فایل کوچک - پردازش مستقیم
+                    # Small file - direct processing
                     output_path = os.path.join(output_dir, f"bot_{video['filename']}")
                     success = await process_video_for_bot_safe(input_path, output_path, title)
                     
@@ -195,11 +195,11 @@ async def retry_failed_uploads():
                         upload_success = await upload_with_bot(output_path, title, telegram_token, channel_id)
                         if upload_success:
                             processed_count += 1
-                            print(f"🎉 آپلود با ربات موفق!")
+                            print(f"🎉 Bot upload successful!")
                         else:
                             failed_count += 1
                         
-                        # حذف فایل موقت
+                        # Cleanup temporary file
                         try:
                             os.remove(output_path)
                         except:
@@ -207,13 +207,13 @@ async def retry_failed_uploads():
                     else:
                         failed_count += 1
                 else:
-                    # فایل بزرگ - تقسیم برای ربات
+                    # Large file - split for bot
                     output_files = await split_video_for_bot_safe(input_path, output_dir, title)
                     
                     if output_files:
                         upload_success_count = 0
                         for j, output_file in enumerate(output_files):
-                            part_title = f"{title} - قسمت {j+1}/{len(output_files)}"
+                            part_title = f"{title} - Part {j+1}/{len(output_files)}"
                             
                             if await upload_with_bot(output_file, part_title, telegram_token, channel_id):
                                 upload_success_count += 1
@@ -224,18 +224,18 @@ async def retry_failed_uploads():
                                 pass
                             
                             if j < len(output_files) - 1:
-                                await asyncio.sleep(5)  # تأخیر کوتاه بین قسمت‌ها
+                                await asyncio.sleep(5)  # Brief delay between parts
                         
                         if upload_success_count == len(output_files):
                             processed_count += 1
-                            print(f"🎊 تمام قسمت‌ها با ربات آپلود شد!")
+                            print(f"🎊 All parts uploaded with bot!")
                         else:
                             failed_count += 1
                     else:
                         failed_count += 1
             
             else:
-                # استفاده از اکانت کاربری
+                # Using User Account
                 output_path = os.path.join(output_dir, f"user_{video['filename']}")
                 success = await process_video_for_user_safe(input_path, output_path, title)
                 
@@ -243,11 +243,11 @@ async def retry_failed_uploads():
                     upload_success = await upload_with_user_account(app, output_path, title, channel_username)
                     if upload_success:
                         processed_count += 1
-                        print(f"🎉 آپلود با اکانت کاربری موفق!")
+                        print(f"🎉 User account upload successful!")
                     else:
                         failed_count += 1
                     
-                    # حذف فایل موقت
+                    # Cleanup temporary file
                     try:
                         os.remove(output_path)
                     except:
@@ -255,32 +255,32 @@ async def retry_failed_uploads():
                 else:
                     failed_count += 1
             
-            # تأخیر بین ویدیوها
+            # Delay between videos
             if i < len(missing_videos):
                 delay = 120 if upload_method == "user" else 30
-                print(f"⏳ انتظار {delay} ثانیه...")
+                print(f"⏳ Waiting {delay} seconds...")
                 await asyncio.sleep(delay)
         
         print(f"\n{'='*60}")
-        print(f"📊 خلاصه نتایج آپلود مجدد:")
-        print(f"   📁 فایل‌های باقی‌مانده: {len(missing_videos)}")
-        print(f"   ✅ موفق: {processed_count}")
-        print(f"   ❌ ناموفق: {failed_count}")
-        print(f"   📈 درصد موفقیت: {(processed_count/len(missing_videos))*100:.1f}%")
+        print(f"📊 Retry Summary:")
+        print(f"   📁 Missing files: {len(missing_videos)}")
+        print(f"   ✅ Successful: {processed_count}")
+        print(f"   ❌ Failed: {failed_count}")
+        print(f"   📈 Success Rate: {(processed_count/len(missing_videos))*100:.1f}%")
         print(f"{'='*60}")
         
-        # نمایش فایل‌های باقی‌مانده
+        # Show remaining files
         if failed_count > 0:
-            print(f"\n⚠️ فایل‌هایی که هنوز آپلود نشده‌اند ممکن است نیاز به بررسی دستی داشته باشند.")
+            print(f"\n⚠️ Files that are still missing may require manual review.")
         
     except KeyboardInterrupt:
-        print("\n⚠️ متوقف شد با Ctrl+C")
+        print("\n⚠️ Stopped by Ctrl+C")
     except Exception as e:
-        print(f"❌ خطای غیرمنتظره: {str(e)}")
+        print(f"❌ Unexpected Error: {str(e)}")
     finally:
         await app.stop()
-        print("🔒 اتصال بسته شد")
+        print("🔒 Connection closed")
 
 if __name__ == "__main__":
-    print("🔄 شروع آپلود مجدد فایل‌های ناموفق...")
+    print("🔄 Starting retry for missing files...")
     asyncio.run(retry_failed_uploads())

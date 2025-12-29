@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Scrape Weekend Youtuber course structure from contentcreator.com
+Scrape Example Course structure from generic platform
 Extracts all sections, lessons, and lesson types
 """
 
@@ -15,7 +15,7 @@ import time
 
 def scrape_course_structure(url, course_name):
     """
-    Scrape course structure from contentcreator.com
+    Scrape course structure from generic platform
     Returns dictionary with sections and their lessons
     """
     
@@ -98,16 +98,16 @@ def scrape_course_structure(url, course_name):
         driver.quit()
 
 def main():
-    url = "https://www.contentcreator.com/products/weekend-youtuber/categories"
+    url = "https://example.com/course/curriculum"
     
     print("=" * 80)
-    print("SCRAPING: Weekend Youtuber Course Structure")
+    print("SCRAPING: Example Course Structure")
     print("=" * 80)
     
-    structure = scrape_course_structure(url, "Weekend Youtuber")
+    structure = scrape_course_structure(url, "Example Course")
     
     # Save to JSON
-    output_file = "/Users/su6i/@-github/telegram-video-automation/.storage/weekend_youtuber_structure.json"
+    output_file = ".storage/course_structure.json"
     with open(output_file, 'w', encoding='utf-8') as f:
         json.dump(structure, f, ensure_ascii=False, indent=2)
     
