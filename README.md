@@ -1,10 +1,21 @@
 # 🚀 Telegram Video Automation Kit
 
+[![LinkedIn](https://img.shields.io/badge/Connect-LinkedIn-blue?style=flat-square&logo=linkedin)](https://www.linkedin.com/in/su6i/)
+
 **Navigation:** [README](README.md) | [Quick Start](QUICK_START.md) | [Scan & Resume](SCAN_RESUME.md)
 
 ---
 
 ## 🏗️ 3-Step Automated Workflow
+
+```mermaid
+graph LR
+    A[🔍 Scan] --> B[📥 Download]
+    B --> C[🚀 Upload]
+    style A fill:#f9f,stroke:#333,stroke-width:2px
+    style B fill:#bbf,stroke:#333,stroke-width:2px
+    style C fill:#bfb,stroke:#333,stroke-width:2px
+```
 
 The system is designed to be fully automated. You only need to run three commands in sequence:
 
@@ -40,6 +51,16 @@ Optimizes, re-encodes, and uploads everything to Telegram.
 - `src/`: Shared core modules.
 - `.storage/`: Local cache, manifest, and history.
 - `temp/`: Temporary processing directory.
+
+---
+
+## 🌟 Key Technical Highlights (For Recruiters)
+This project demonstrates several advanced software engineering concepts:
+- **Resilient Web Scraping**: Implements a modular scraping engine with session management and cookie persistence.
+- **Multithreaded Processing**: Accelerated video downloads and processing using concurrent execution.
+- **Automated Video Engineering**: Real-time re-encoding, resolution scaling, and dynamic title card generation using `FFmpeg`.
+- **Telegram Bot Integration**: Complex API interaction for automated sequential uploads and real-time caption updates.
+- **Clean Architecture**: Decoupled modules for scraping, processing, and communication.
 
 ---
 

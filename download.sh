@@ -1,2 +1,2 @@
 #!/bin/bash
-"$(dirname "$0")/.venv/bin/python" scripts/smart_scraper.py --download "$@"
+"$(dirname "$0")/.venv/bin/python" scripts/course_scraper.py --download "$@"
