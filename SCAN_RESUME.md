@@ -1,51 +1,23 @@
-# Scan & Resume Guide
+# 🔍 Scan & Resume Guide
 
-## Core Logic
-
-The scanning engine is designed for efficiency and safety. It creates a "snapshot" of the remote site's structure without redundant scraping.
-
-### Features
-✅ **Incremental Scanning**: Compares remote lesson IDs with the local manifest entries. Only new lessons are parsed and appended.
-✅ **Full Trace**: Every lesson is attributed to a specific module (Section) and course, maintaining the original hierarchy.
-✅ **Safe Metadata**: Downloads and caches HTML source for lesson pages for offline processing of resources.
+**Navigation:** [README](file:///Users/su6i/@-github/telegram-video-automation/README.md) | [Quick Start](file:///Users/su6i/@-github/telegram-video-automation/QUICK_START.md) | [Scan & Resume](file:///Users/su6i/@-github/telegram-video-automation/SCAN_RESUME.md)
 
 ---
 
-## Detailed Operation
+## 🛠️ Manifest Discovery
 
-### 1. Initial Scan
-Builds the complete library manifest for the first time.
-```bash
-./scan.sh
-```
+Scanning is the first layer of the pipeline. It builds the `downloaded_video.txt` manifest which acts as the "Source of Truth" for all subsequent download and upload phases.
 
-### 2. New Content Discovery
-Run this whenever you want to check for new course updates.
-```bash
-./scan.sh --scan
-```
-- **Scenario**: You had 85 videos, 5 new ones were released.
-- **Output**: 
-  ```
-  📋 Found 85 existing videos in manifest
-  ✅ Found 5 NEW videos (85 + 5 = 90 total).
-  ```
+### 🔄 Incremental Operations
+- **Full Scan**: Run `./scan.sh` to extract the complete hierarchy.
+- **Deep Resume**: If the process is interrupted, re-running `./scan.sh` will verify existing entries and only scrape missing content.
 
-### 3. Verification & Testing
-Target a specific amount of content for debugging purposes.
-```bash
-./scan.sh --limit 5
-```
+## 💾 Local Storage
+All scan results are cached in the `.storage/` directory to prevent redundant network requests:
+- `downloaded_video.txt`: Flat list of all discovered lessons.
+- `scraped_content.json`: Detailed descriptions and associated resource links.
+- `page_archives/`: Cached HTML source for offline processing.
 
 ---
 
-## Execution Pipeline
-
-After scanning, the subsequent steps are:
-
-1. **Download**: `bash download.sh` fetches the physical media.
-2. **Process & Upload**: `python3 scripts/process_and_upload.py` encodes and distributes to Telegram.
-
----
-
-**Note**: All scan status and logs are kept in the `.storage/` directory. If you manually edit the manifest file, ensure you maintain the pipe-delimited (`|`) format to avoid parsing errors.
+**Next Steps:** Proceed to the [Download Phase](file:///Users/su6i/@-github/telegram-video-automation/QUICK_START.md).

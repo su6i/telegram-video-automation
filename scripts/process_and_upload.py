@@ -54,7 +54,11 @@ if channel_username and (channel_username.startswith('-') or channel_username.is
     except ValueError:
         pass
 
-import argparse
+import asyncio
+import sys
+import subprocess
+from pyrogram import Client
+from pyrogram.types import Message
 
 # Argument Config
 parser = argparse.ArgumentParser(description="Upload videos to Telegram")
@@ -381,6 +385,25 @@ async def main():
                      history_data = json.load(f)
              except:
                  pass
+
+        # 2.5 Handle One-Time Placeholders for Index 001
+        is_first_upload = any(v['index'] == '001' for v in manifest_videos if not v['is_done'] and v['index'] not in history_data)
+        
+        if is_first_upload:
+            # Check history to see if we've EVER uploaded anything to this channel via this script
+            if not history_data:
+                print(f"\n🆕 First run detected! Sending 10 placeholders for Indexing...")
+                for p in range(1, 11):
+                    try:
+                        placeholder_text = f"📍 **Index Reserved #{p}**\n(Will be updated automatically)"
+                        if bot_available:
+                            await bot.send_message(chat_id=channel_id, text=placeholder_text)
+                        else:
+                            await app.send_message(chat_id=channel_username, text=placeholder_text)
+                        print(f"   ✅ Placeholder {p}/10 sent.")
+                    except Exception as e:
+                        print(f"   ⚠️ Failed to send placeholder {p}: {e}")
+                print("🏁 Placeholders ready.\n")
 
         # 3. Iterate through manifest sequence
         for i, m_video in enumerate(manifest_videos, 1):
