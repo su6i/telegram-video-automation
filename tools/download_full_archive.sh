@@ -14,7 +14,7 @@ echo "=========================================="
 
 # Step 1: Download Videos
 echo "📼 Step 1: Downloading Videos..."
-python3 scripts/smart_scraper.py --download
+python3 scripts/course_scraper.py --download
 
 # Step 2: Archive Pages
 echo "📚 Step 2: Archiving Course Pages (HTML + Assets)..."
