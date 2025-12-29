@@ -1,6 +1,6 @@
 # 📚 Quick Start Guide
 
-**Navigation:** [README](file:///Users/su6i/@-github/telegram-video-automation/README.md) | [Quick Start](file:///Users/su6i/@-github/telegram-video-automation/QUICK_START.md) | [Scan & Resume](file:///Users/su6i/@-github/telegram-video-automation/SCAN_RESUME.md)
+**Navigation:** [README](README.md) | [Quick Start](QUICK_START.md) | [Scan & Resume](SCAN_RESUME.md)
 
 ---
 
@@ -37,4 +37,4 @@ Handles re-encoding and delivery to Telegram.
 
 ---
 
-**Note:** For troubleshooting or advanced parameters, refer to the [Main README](file:///Users/su6i/@-github/telegram-video-automation/README.md).
+**Note:** For troubleshooting or advanced parameters, refer to the [Main README](README.md).

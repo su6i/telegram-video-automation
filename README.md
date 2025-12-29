@@ -1,6 +1,6 @@
 # 🚀 Telegram Video Automation Kit
 
-**Navigation:** [README](file:///Users/su6i/@-github/telegram-video-automation/README.md) | [Quick Start](file:///Users/su6i/@-github/telegram-video-automation/QUICK_START.md) | [Scan & Resume](file:///Users/su6i/@-github/telegram-video-automation/SCAN_RESUME.md)
+**Navigation:** [README](README.md) | [Quick Start](QUICK_START.md) | [Scan & Resume](SCAN_RESUME.md)
 
 ---
 
@@ -43,4 +43,4 @@ Optimizes, re-encodes, and uploads everything to Telegram.
 
 ---
 
-**Next Steps:** Check the [Quick Start Guide](file:///Users/su6i/@-github/telegram-video-automation/QUICK_START.md) for environment setup.
+**Next Steps:** Check the [Quick Start Guide](QUICK_START.md) for environment setup.
