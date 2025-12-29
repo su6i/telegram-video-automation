@@ -24,6 +24,6 @@ else:
     print(f"❌ Backup file not found: {BACKUP_FILE}")
 
 print("\n💡 Next steps:")
-print("   1. Run: python scripts/course_scraper.py --scan")
+print("   1. Run: python scripts/scraper.py --scan")
 print("   2. The improved scraper will organize sections properly")
 print("   3. Verify .storage/downloaded_video.txt has proper ## --- Section --- headers")
