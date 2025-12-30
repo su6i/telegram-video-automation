@@ -656,8 +656,21 @@ async def main():
                 print("🏁 Index reservation complete.\n")
 
         # 3. Iterate through manifest sequence
+        total_files = len(manifest_videos)
+        
+        if HAS_TQDM and not args.dry_run:
+            pbar = tqdm(total=total_files, desc="Overall Progress", unit="video", position=0, leave=True, bar_format='{l_bar}{bar:40}{r_bar}{bar:-10b}')
+        else:
+            pbar = None
+            if not HAS_TQDM and not args.dry_run:
+                print("💡 Tip: Install 'tqdm' (pip install tqdm) for a visual progress bar!")
+
         for i, m_video in enumerate(manifest_videos, 1):
             idx = m_video['index']
+            
+            if pbar:
+                pbar.set_description(f"[{idx}] {m_video['title'][:35]}...")
+                pbar.update(0) # Refresh description
             
             # Skip if already done
             if m_video['is_done'] or idx in history_data:
@@ -937,10 +950,22 @@ async def main():
                             print(f"   🗑️ Removed: {os.path.basename(f_path)}")
                     except Exception as e:
                         print(f"   ⚠️ Cleanup failed for {f_path}: {e}")
+            if pbar:
+                pbar.update(1)
+
             # Delay between videos
             if i < total_files:
                 delay = 120 if upload_method == "user" else 30  # Longer delay for User Account
-                print(f"⏳ Waiting {delay} seconds...")
+                if pbar:
+                    for _ in range(delay):
+                        time_left = delay - _
+                        pbar.set_description(f"⏳ Cooling down ({time_left}s)...")
+                        await asyncio.sleep(1)
+                else:
+                    print(f"⏳ Waiting {delay} seconds...")
+        
+        if pbar:
+            pbar.close()
         
         print(f"\n{'='*60}")
         print(f"📊 Summary:")
