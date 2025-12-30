@@ -12,6 +12,14 @@ from pathlib import Path
 from datetime import datetime
 from dotenv import load_dotenv
 
+# Progress bar (optional)
+try:
+    from tqdm import tqdm
+    HAS_TQDM = True
+except ImportError:
+    HAS_TQDM = False
+    tqdm = None
+
 from telegram import Bot
 from telegram.error import TelegramError
 from pyrogram import Client
@@ -270,6 +278,60 @@ def unfragment_text(text):
     # Join with DOUBLE NEWLINES for "breathable" layout
     result = '\n\n'.join(cleaned_lines).strip()
     return result
+
+
+def escape_markdown_text(text):
+    """
+    Escape special Markdown characters in plain text to prevent parsing errors.
+    Preserves intentional formatting like **bold** and [links](url).
+    """
+    if not text:
+        return text
+    
+    # Count ** markers - must be even for valid Markdown
+    bold_count = text.count('**')
+    if bold_count % 2 != 0:
+        # Odd number of ** - remove the last one to fix
+        last_pos = text.rfind('**')
+        text = text[:last_pos] + text[last_pos+2:]
+    
+    # Escape underscores that aren't part of links
+    # But preserve _italic_ formatting if intended
+    text = re.sub(r'(?<!\[)_(?![\w\s]*\]\()', r'\_', text)
+    
+    return text
+
+
+def validate_caption(caption):
+    """
+    Validate and fix caption before sending to Telegram.
+    Ensures all Markdown markers are properly closed.
+    """
+    if not caption:
+        return caption
+    
+    # Fix unclosed ** markers
+    bold_count = caption.count('**')
+    if bold_count % 2 != 0:
+        # Find the last unclosed ** and remove it
+        last_pos = caption.rfind('**')
+        caption = caption[:last_pos] + caption[last_pos+2:]
+    
+    # Fix unclosed ` markers  
+    backtick_count = caption.count('`')
+    if backtick_count % 2 != 0:
+        last_pos = caption.rfind('`')
+        caption = caption[:last_pos] + caption[last_pos+1:]
+    
+    # Fix unclosed [] or () in links
+    # Simple check: count should be equal
+    if caption.count('[') != caption.count(']'):
+        caption = caption.replace('[', '').replace(']', '')
+    if caption.count('(') != caption.count(')'):
+        # Only remove markdown-style parentheses, not regular ones
+        pass  # Too risky to auto-fix
+    
+    return caption
 
 
 def format_description_markdown(text):
@@ -777,7 +839,8 @@ async def main():
                  # Bot
                  for j, f_path in enumerate(processed_files):
                      part_caption = caption if len(processed_files) == 1 else f"{caption}\n(Part {j+1}/{len(processed_files)})"
-                     msg = await upload_with_bot(f_path, part_caption, telegram_token, channel_id, thumb=thumb_path if has_thumb else None)
+                     part_caption = validate_caption(part_caption)  # Fix Markdown
+                      msg = await upload_with_bot(f_path, part_caption, telegram_token, channel_id, thumb=thumb_path if has_thumb else None)
                      if msg:
                          processed_count += 1
                          print(f"🎉 Bot upload successful!")
