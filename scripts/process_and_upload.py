@@ -362,14 +362,17 @@ def format_description_markdown(text):
     if not text:
         return text
     
-    # Known header/callout patterns
+    # words that should NEVER be a standalone header
+    EXCLUDED_WORDS = {'Both', 'His', 'Their', 'Once', 'The', 'And', 'With', 'From', 'This', 'That', 'These', 'Those'}
+    
+    # Known header/callout patterns (Restricted to start of line or after newline)
     header_patterns = [
-        r'\b(Your Robot Buddy)\s+',
-        r'\b(Superman)\s+',
-        r'\b(Swimming with sharks)\s+',
-        r'\b(Game of [Tt]hrones)\s+',
-        r'\b(Wizard)\s+(?=an image)',
-        r'\b(Pirate)\s+(?=\[insert)',
+        r'(?m)^ *(Your Robot Buddy)\s+',
+        r'(?m)^ *(Superman)\s+',
+        r'(?m)^ *(Swimming with sharks)\s+',
+        r'(?m)^ *(Game of [Tt]hrones)\s+',
+        r'(?m)^ *(Wizard)\s+(?=an image)',
+        r'(?m)^ *(Pirate)\s+(?=\[insert)',
         r'\b(EXTREMELY IMPORTANT!?)\b',
         r'\b(IMPORTANT!?)\b',
         r'\b(NOTE:?)\b',
@@ -385,9 +388,17 @@ def format_description_markdown(text):
         processed = re.sub(pattern, r'\n\n\1\n', processed)
     
     # Also detect generic Title Case headers (2-4 words, followed by longer text)
+    # INCREASED RESTRICTION: Must not be in EXCLUDED_WORDS
+    def generic_header_fix(match):
+        header_text = match.group(1).strip()
+        first_word = header_text.split()[0]
+        if first_word in EXCLUDED_WORDS and len(header_text.split()) == 1:
+            return match.group(0) # Don't split
+        return f"\n\n{header_text}\n"
+
     processed = re.sub(
-        r'(?<=[.!?\n])\s*([A-Z][a-z]+(?:\s+[A-Z][a-z]+){0,3})\s+(?=[a-z]{10,})',
-        r'\n\n\1\n',
+        r'(?<=[.!?\n])\s*([A-Z][a-z]+(?:\s+[A-Z][a-z]+){0,3})\s+(?=[a-z]{15,})',
+        generic_header_fix,
         processed
     )
     
@@ -408,38 +419,39 @@ def format_description_markdown(text):
         # Detect headers:
         is_header = False
         
+        # 0. Check EXCLUDED_WORDS
+        if stripped in EXCLUDED_WORDS:
+            is_header = False
+            
         # 1. Known callouts (ALL CAPS or special words)
-        if re.search(r'^(EXTREMELY\s+)?(IMPORTANT|NOTE|TIP|WARNING|RECAP|RESOURCES|HOW TO)\b', stripped.upper()):
+        elif re.search(r'^(EXTREMELY\s+)?(IMPORTANT|NOTE|TIP|WARNING|RECAP|RESOURCES|HOW TO)\b', stripped.upper()):
             is_header = True
             
         # 2. Short line (< 40 chars) that looks like a title
-        elif len(stripped) < 40 and not stripped.endswith('.'):
+        elif len(stripped) < 40 and not stripped.endswith(('.', '!', '?')):
             words = stripped.split()
-            if 1 <= len(words) <= 6:
+            if 1 <= len(words) <= 5:
                 # Check Title Case ratio
                 capitalized = sum(1 for w in words if w and (w[0].isupper() or not w[0].isalpha()))
-                if capitalized >= len(words) * 0.7:
-                    is_header = True
+                if capitalized >= len(words) * 0.8:
+                    # Final check: Don't bold if it's just a single common word
+                    if not (len(words) == 1 and words[0] in EXCLUDED_WORDS):
+                        is_header = True
         
         # 3. Ends with colon
         elif stripped.endswith(':') and len(stripped) < 60:
             is_header = True
         
         # 4. ALL CAPS
-        elif stripped.isupper() and 3 < len(stripped) < 45:
+        elif stripped.isupper() and 3 < len(stripped) < 40:
             is_header = True
         
         if is_header:
-            # Ensure spacing before header if not at start
             if formatted_lines and formatted_lines[-1]:
                 formatted_lines.append('')
             formatted_lines.append(f"**{stripped}**")
         else:
-            # For non-headers, ensure list items are readable
-            if re.match(r'^(\d+\.|[\-•·*])\s+\S', stripped):
-                formatted_lines.append(stripped)
-            else:
-                formatted_lines.append(stripped)
+            formatted_lines.append(stripped)
     
     # Join and clean up excessive newlines (max 2)
     result = '\n'.join(formatted_lines)
