@@ -359,38 +359,29 @@ async def process_video_for_bot_safe(input_path, output_path, title, add_intro=F
                 output_path
             ])
         else:
-            # ✅ No intro: ALWAYS re-encode to target resolution
+            # ✅ Without intro: Still Scale!
             orig_info = get_video_info(input_path)
             orig_w = orig_info.get('width', 1920) if orig_info else 1920
             orig_h = orig_info.get('height', 1080) if orig_info else 1080
             
             print(f"   🔄 Re-encoding {orig_w}x{orig_h} → {target_w}x{target_h}...")
-            encoder = detect_hw_encoder()
             
             process_cmd = [
                 "ffmpeg", "-y",
                 "-i", input_path,
-                "-vf", f"fps=25,scale={target_w}:{target_h}:force_original_aspect_ratio=decrease,pad={target_w}:{target_h}:(ow-iw)/2:(oh-ih)/2,setsar=1",
-                "-c:v", encoder,
+                "-vf", (
+                    f"fps=25,scale={target_w}:{target_h}:force_original_aspect_ratio=decrease,"
+                    f"pad={target_w}:{target_h}:(ow-iw)/2:(oh-ih)/2,setsar=1"
+                ),
+                "-c:v", "libx264",
+                "-af", "aresample=44100,aformat=sample_fmts=fltp:channel_layouts=stereo",
                 "-c:a", "aac",
-                "-ar", "44100",
-                "-ac", "2",
-            ]
-            if encoder == 'libx264':
-                process_cmd.extend(["-preset", "fast", "-crf", "23"])
-            elif encoder == 'h264_videotoolbox':
-                # VideoToolbox: Use average bitrate for speed
-                process_cmd.extend(["-b:v", "4M", "-maxrate", "6M", "-bufsize", "8M"])
-            elif encoder == 'h264_nvenc':
-                process_cmd.extend(["-preset", "fast", "-cq", "23"])
-            else:
-                process_cmd.extend(["-preset", "fast"])
-            
-            process_cmd.extend([
+                "-preset", "medium",
+                "-crf", "23",
                 "-pix_fmt", "yuv420p",
                 "-movflags", "+faststart",
                 output_path
-            ])
+            ]
         
         # ✅ Show ffmpeg progress in terminal
         result = subprocess.run(
@@ -507,36 +498,25 @@ async def process_video_for_user_safe(input_path, output_path, title, add_intro=
                 output_path
             ])
         else:
-            # ✅ No intro: ALWAYS re-encode to target resolution
+            # ✅ Without intro: Still Scale!
             print(f"   🔄 Re-encoding {orig_w}x{orig_h} → {target_w}x{target_h}...")
-            encoder = detect_hw_encoder()
             
             process_cmd = [
                 "ffmpeg", "-y",
                 "-i", input_path,
-                "-vf", f"fps=25,scale={target_w}:{target_h}:force_original_aspect_ratio=decrease,pad={target_w}:{target_h}:(ow-iw)/2:(oh-ih)/2,setsar=1",
-                "-c:v", encoder,
+                "-vf", (
+                    f"fps=25,scale={target_w}:{target_h}:force_original_aspect_ratio=decrease,"
+                    f"pad={target_w}:{target_h}:(ow-iw)/2:(oh-ih)/2,setsar=1"
+                ),
+                "-c:v", "libx264",
+                "-af", "aresample=44100,aformat=sample_fmts=fltp:channel_layouts=stereo",
                 "-c:a", "aac",
-                "-ar", "44100",
-                "-ac", "2",
-            ]
-            # Encoder-specific options for speed + quality balance
-            if encoder == 'libx264':
-                process_cmd.extend(["-preset", "fast", "-crf", "23"])
-            elif encoder == 'h264_videotoolbox':
-                # VideoToolbox: Use average bitrate for speed (no 2-pass needed)
-                # 4Mbps is good for 720p streaming
-                process_cmd.extend(["-b:v", "4M", "-maxrate", "6M", "-bufsize", "8M"])
-            elif encoder == 'h264_nvenc':
-                process_cmd.extend(["-preset", "fast", "-cq", "23"])
-            else:
-                process_cmd.extend(["-preset", "fast"])
-            
-            process_cmd.extend([
+                "-preset", "medium",
+                "-crf", "23",
                 "-pix_fmt", "yuv420p",
                 "-movflags", "+faststart",
                 output_path
-            ])
+            ]
         
         # ✅ Show ffmpeg progress in terminal (stdout=None, stderr=None)
         result = subprocess.run(
