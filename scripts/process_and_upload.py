@@ -310,6 +310,15 @@ def validate_caption(caption):
     if not caption:
         return caption
     
+    # Escape underscores that aren't part of italic formatting
+    # Replace standalone _ with \_ (but preserve __text__ italic)
+    # First, protect intentional _italic_ patterns
+    caption = re.sub(r'(?<!\w)_(\w+)_(?!\w)', r'ITALIC_START\1ITALIC_END', caption)
+    # Escape remaining underscores
+    caption = caption.replace('_', r'\_')
+    # Restore italic patterns
+    caption = caption.replace('ITALIC_START', '_').replace('ITALIC_END', '_')
+    
     # Fix unclosed ** markers
     bold_count = caption.count('**')
     if bold_count % 2 != 0:
