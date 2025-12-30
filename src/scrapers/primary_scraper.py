@@ -629,57 +629,31 @@ class PrimaryScraper(BaseScraper):
 
         if selected_div:
              div = selected_div
-             seen_links = set()
-             # Enhance List Formatting: Prepend bullet to <li> items
-             for li in div.find_all("li"):
-                 if li.string:
-                     if not li.string.strip().startswith("•"):
-                         li.string = f"• {li.string}"
-                 else:
-                     if li.contents and isinstance(li.contents[0], str):
-                         li.contents[0].replace_with(f"• {li.contents[0]}")
-                     else:
-                         li.insert(0, "• ")
-
-             # Capture text
-             body_content = div.get_text(separator="\n", strip=True)
-                 
-             
-             # Capture links from this div
+             # 1. Collect External/Sidebar Links FIRST
+             extracted_links = []
              for a in div.find_all("a", href=True):
-                 text = a.get_text(strip=True) or "Link"
-                 url = a["href"]
+                 link_text = a.get_text(strip=True) or "Link"
+                 link_url = a['href']
                  
-                 # Contextual Enhancement for generic links
-                 if text.upper() in ["CLICK HERE", "HERE", "LINK", "VISIT", "OPEN"]:
-                     # Try to find preceding text (Label)
-                     # 1. Previous Sibling (Text Node)
-                     prev = a.previous_sibling
-                     label = ""
-                     if prev and isinstance(prev, str):
-                         label = prev.strip()
-                     # 2. If inside a <p> or <li>, maybe the parent text before the <a>?
-                     elif not label:
-                         parent = a.parent
-                         if parent:
-                             pass
-                             
-                     if label:
-                         # Clean label (e.g. "Minimax:" -> "Minimax")
-                         label = label.rstrip(" :").strip()
-                         if label:
-                             text = f"{label}: {text}" # e.g. "Minimax: CLICK HERE"
-
-                 info = {
-                     "text": text,
-                     "url": url
-                 }
-                 if info['url'].startswith("http") and info['url'] not in seen_links:
-                     # Skip internal course links if they point back to the same product
-                     if "/products/" in info['url'] and "categories" in info['url']:
+                 if link_url.startswith("http") and link_url not in seen_links:
+                     # Heuristic: Internal course links shouldn't be in the global "Links" section
+                     if "/products/" in link_url and "/categories" in link_url:
                          continue
-                     extracted_links.append(info)
-                     seen_links.add(info['url'])
+                     extracted_links.append({"text": link_text, "url": link_url})
+                     seen_links.add(link_url)
+
+             # 2. IN-TEXT LINK PRESERVATION: Convert <a> to Markdown [text](url)
+             # Note: We iterate a second time to replace them in the DOM
+             for a in div.find_all("a", href=True):
+                 t = a.get_text(strip=True)
+                 u = a['href']
+                 if u.startswith("http") and t:
+                     # Only convert if it's likely a real content link
+                     if "/products/" not in u or "/posts/" in u:
+                         a.replace_with(f"[{t}]({u})")
+
+             # 3. Capture text
+             body_content = div.get_text(separator="\n", strip=True)
         
         page_source = driver.page_source
         wistia_id = None
