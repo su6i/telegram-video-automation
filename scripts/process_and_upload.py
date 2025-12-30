@@ -12,13 +12,9 @@ from pathlib import Path
 from datetime import datetime
 from dotenv import load_dotenv
 
-# Progress bar (optional)
-try:
-    from tqdm import tqdm
-    HAS_TQDM = True
-except ImportError:
-    HAS_TQDM = False
-    tqdm = None
+# Progress bar removed to restore detailed output
+HAS_TQDM = False
+tqdm = None
 
 from telegram import Bot
 from telegram.error import TelegramError
@@ -248,26 +244,30 @@ def unfragment_text(text):
             # Decide if 'stripped' should join 'current_buffer'
             last_char = current_buffer[-1] if current_buffer else ""
             
-            is_list_item = re.match(r'^(\d+\.|[\-•·*])\s+\S', stripped)
-            is_header = stripped.isupper() and len(stripped) < 40 or stripped.endswith(':')
+            is_list_item = re.match(r'^(\d+\.|[\-•·*])\s+\S', stripped) or re.match(r'^\d+\.?$', stripped)
+            
+            # Protected Headers (Should not be merged into paragraphs)
+            PROTECTED_HEADERS = {'Your Robot Buddy', 'Superman', 'Swimming with sharks', 'Game of Thrones', 'Wizard', 'Pirate', 'EXTREMELY IMPORTANT', 'IMPORTANT NOTE', 'Lesson Recap', 'Prompt Template', 'Continued'}
+            is_protected_header = any(h.upper() in stripped.upper() for h in PROTECTED_HEADERS)
+            
+            is_header = is_protected_header or (stripped.isupper() and len(stripped) < 40) or (stripped.endswith(':') and len(stripped) < 60)
             
             # AGGRESSIVE JOIN CONDITIONS:
-            # - Buffer doesn't end with a period/question/exclamation
-            # - Stripped starts with a lowercase letter
-            # - Stripped is very short and buffer isn't finished
-            # - Stripped is a single symbol like '!'
             starts_lower = stripped[0].islower() if stripped and stripped[0].isalpha() else False
             is_punctuation_solo = stripped in ".!?,;:"
             
+            # DON'T JOIN if it's a list item OR a protected header
             should_join = False
-            if last_char not in ".!?:;" and not is_list_item:
+            
+            if is_list_item or is_header:
+                should_join = False
+            elif last_char not in ".!?:;":
                 should_join = True
             elif starts_lower:
                 should_join = True
             elif is_punctuation_solo:
                 should_join = True
-            elif len(stripped.split()) == 1 and not is_header and not is_list_item:
-                # Catch single words like 'EXTREMELY' or 'IMPORTANT'
+            elif len(stripped.split()) == 1:
                 should_join = True
                 
             if should_join:
@@ -385,19 +385,37 @@ def format_description_markdown(text):
     # First pass: Protect and isolate potential headers
     processed = text
     for pattern in header_patterns:
-        processed = re.sub(pattern, r'\n\n\1\n', processed)
+        # Use placeholders to protect headers from vertical merging
+        processed = re.sub(pattern, r'\n\n@@@\1@@@\n', processed)
     
-    # Also detect generic Title Case headers (2-4 words, followed by longer text)
-    # INCREASED RESTRICTION: Must not be in EXCLUDED_WORDS
+    # 1.5 Join vertical text ONLY if they aren't protected headers
+    lines = processed.split('\n')
+    joined_lines = []
+    temp_buf = []
+    
+    for line in lines:
+        s = line.strip()
+        if not s:
+            if temp_buf: joined_lines.append(" ".join(temp_buf)); temp_buf = []
+            joined_lines.append("")
+        elif s.startswith("@@@") and s.endswith("@@@"):
+            if temp_buf: joined_lines.append(" ".join(temp_buf)); temp_buf = []
+            joined_lines.append(s)
+        else:
+            temp_buf.append(s)
+    if temp_buf: joined_lines.append(" ".join(temp_buf))
+    processed = "\n".join(joined_lines)
+
+    # Also detect generic Title Case headers
     def generic_header_fix(match):
         header_text = match.group(1).strip()
         first_word = header_text.split()[0]
         if first_word in EXCLUDED_WORDS and len(header_text.split()) == 1:
-            return match.group(0) # Don't split
-        return f"\n\n{header_text}\n"
+            return match.group(0)
+        return f"\n\n@@@{header_text}@@@\n"
 
     processed = re.sub(
-        r'(?<=[.!?\n])\s*([A-Z][a-z]+(?:\s+[A-Z][a-z]+){0,3})\s+(?=[a-z]{15,})',
+        r'(?<=[.!?\n])\s*([A-Z][a-z]+(?:\s+[A-Z][a-z]+){1,3})\s+(?=[a-z]{15,})',
         generic_header_fix,
         processed
     )
@@ -411,40 +429,33 @@ def format_description_markdown(text):
             formatted_lines.append('')
             continue
         
+        # Unmask protected headers
+        is_protected = False
+        if stripped.startswith("@@@") and stripped.endswith("@@@"):
+            stripped = stripped.replace("@@@", "")
+            is_protected = True
+        
         # Skip if already has Markdown formatting
         if (stripped.startswith('**') and stripped.endswith('**')) or stripped.startswith('['):
             formatted_lines.append(stripped)
             continue
-        
-        # Detect headers:
-        is_header = False
-        
-        # 0. Check EXCLUDED_WORDS
-        if stripped in EXCLUDED_WORDS:
-            is_header = False
             
-        # 1. Known callouts (ALL CAPS or special words)
-        elif re.search(r'^(EXTREMELY\s+)?(IMPORTANT|NOTE|TIP|WARNING|RECAP|RESOURCES|HOW TO)\b', stripped.upper()):
-            is_header = True
-            
-        # 2. Short line (< 40 chars) that looks like a title
-        elif len(stripped) < 40 and not stripped.endswith(('.', '!', '?')):
-            words = stripped.split()
-            if 1 <= len(words) <= 5:
-                # Check Title Case ratio
-                capitalized = sum(1 for w in words if w and (w[0].isupper() or not w[0].isalpha()))
-                if capitalized >= len(words) * 0.8:
-                    # Final check: Don't bold if it's just a single common word
-                    if not (len(words) == 1 and words[0] in EXCLUDED_WORDS):
+        is_header = is_protected
+        
+        # Additional detection for unprotected lines
+        if not is_header:
+            if stripped in EXCLUDED_WORDS:
+                is_header = False
+            elif re.search(r'^(EXTREMELY\s+)?(IMPORTANT|NOTE|TIP|WARNING|RECAP|HOW TO)\b', stripped.upper()):
+                is_header = True
+            elif len(stripped) < 40 and not stripped.endswith(('.', '!', '?')):
+                words = stripped.split()
+                if 1 <= len(words) <= 5:
+                    capitalized = sum(1 for w in words if w and (w[0].isupper() or not w[0].isalpha()))
+                    if capitalized >= len(words) * 0.8 and words[0] not in EXCLUDED_WORDS:
                         is_header = True
-        
-        # 3. Ends with colon
-        elif stripped.endswith(':') and len(stripped) < 60:
-            is_header = True
-        
-        # 4. ALL CAPS
-        elif stripped.isupper() and 3 < len(stripped) < 40:
-            is_header = True
+            elif (stripped.endswith(':') or stripped.isupper()) and len(stripped) < 45:
+                is_header = True
         
         if is_header:
             if formatted_lines and formatted_lines[-1]:
@@ -452,6 +463,7 @@ def format_description_markdown(text):
             formatted_lines.append(f"**{stripped}**")
         else:
             formatted_lines.append(stripped)
+
     
     # Join and clean up excessive newlines (max 2)
     result = '\n'.join(formatted_lines)
@@ -604,7 +616,7 @@ async def main():
                 bot_available = False # Disable bot for this run
         
         # 1. Scan available physical files once
-        print(f"\n🔍 Scanning all media paths...")
+        print(f"🔍 Scanning all media paths...")
         physical_videos = {} # Map index -> (filename, full_path)
         
         for filename, full_path in list_all_videos():
@@ -637,7 +649,7 @@ async def main():
             # Check history to see if we've EVER uploaded anything to this channel via this script
             if not history_data:
                 res_count = 15
-                print(f"\n🆕 First run detected! Reserving {res_count} messages for Index (Table of Contents)...")
+                print(f"🆕 First run detected! Reserving {res_count} messages for Index (Table of Contents)...")
                 for p in range(1, res_count + 1):
                     try:
                         placeholder_text = (
@@ -658,19 +670,14 @@ async def main():
         # 3. Iterate through manifest sequence
         total_files = len(manifest_videos)
         
-        if HAS_TQDM and not args.dry_run:
-            pbar = tqdm(total=total_files, desc="Overall Progress", unit="video", position=0, leave=True, bar_format='{l_bar}{bar:40}{r_bar}{bar:-10b}')
-        else:
-            pbar = None
-            if not HAS_TQDM and not args.dry_run:
-                print("💡 Tip: Install 'tqdm' (pip install tqdm) for a visual progress bar!")
+        pbar = None
+        if not HAS_TQDM and not args.dry_run:
+            print("💡 Tip: Install 'tqdm' (pip install tqdm) for a visual progress bar!")
 
         for i, m_video in enumerate(manifest_videos, 1):
             idx = m_video['index']
             
-            if pbar:
-                pbar.set_description(f"[{idx}] {m_video['title'][:35]}...")
-                pbar.update(0) # Refresh description
+            # pbar logic removed
             
             # Skip if already done
             if m_video['is_done'] or idx in history_data:
@@ -679,10 +686,10 @@ async def main():
 
             # CRITICAL: Next video MUST exist
             if idx not in physical_videos:
-                print(f"\n{'!'*60}")
+                print(f"{'!'*60}")
                 print(f"❌ Error: File for next video ({idx}) not found!")
                 print(f"   Title: {m_video['title']}")
-                print(f"\n   ⚠️ Possible cause: The drive containing this file is not connected.")
+                print(f"   ⚠️ Possible cause: The drive containing this file is not connected.")
                 print(f"   ⚠️ Program halted to maintain sequence in Telegram.")
                 print(f"{'!'*60}\n")
                 return # HALT
@@ -694,7 +701,7 @@ async def main():
             # 🔄 DRY-RUN MODE: Just show what would be done
             if args.dry_run:
                 file_size_mb = os.path.getsize(input_path) / (1024 * 1024)
-                print(f"\n[DRY-RUN] {idx} - {title}")
+                print(f"[DRY-RUN] {idx} - {title}")
                 print(f"   📁 Source: {filename}")
                 print(f"   📏 Size: {file_size_mb:.2f}MB")
                 print(f"   {'🎞️ Would add intro' if args.intro else '⚡ No intro (stream copy)'}")
@@ -705,6 +712,7 @@ async def main():
             caption = title
             full_desc = ""
             need_overflow = False
+            overflow_text = ""
             
             if meta:
                 # HEADER (Professional Bold Format)
@@ -770,34 +778,49 @@ async def main():
                     if desc:
                         # Clean labels, spacing
                         desc = re.sub(r'(?i)CLICK\s*HERE\s*:?\s*', '', desc)
+                        
+                        # Deduplicate Title & Section: If desc contains the title or section title, clean it up
+                        clean_title = final_title.lower().strip()
+                        clean_section = meta['section'].lower().strip() if meta.get('section') else ""
+                        
+                        desc_lines = desc.split('\n')
+                        new_desc_lines = []
+                        skipped_header = False
+                        
+                        for line in desc_lines:
+                            line_lower = line.lower().strip()
+                            if not line_lower:
+                                new_desc_lines.append(line)
+                                continue
+                                
+                            # Check if line duplicates title OR section title
+                            is_dup = (clean_title in line_lower or line_lower in clean_title) or \
+                                     (clean_section and (clean_section in line_lower or line_lower in clean_section))
+                            
+                            if not skipped_header and is_dup and len(line_lower) > 3:
+                                # Skip this line but only once for title and once for section if needed
+                                # For simplicity, skip any line at the top that matches
+                                continue
+                            else:
+                                # Once we hit a non-header line, stop skipping
+                                skipped_header = True
+                                new_desc_lines.append(line)
+                        
+                        desc = "\n".join(new_desc_lines).strip(" :- \n\r")
+
                         desc = unfragment_text(desc)
                         desc = format_description_markdown(desc)  # ✅ Make headers bold
                         desc = re.sub(r'\n{3,}', '\n\n', desc).strip()
                         
-                        current_len = len(caption) + len("📝 **Info:**\n")
-                        remaining = 1024 - current_len - 20
-
-                        if len(desc) <= remaining:
-                            caption += f"📝 **Info:**\n{desc}"
-                        else:
-                            candidate = desc[:remaining]
-                            last_break = max(candidate.rfind('\n\n'), candidate.rfind('\n'), candidate.rfind('. '))
-                            
-                            if last_break > 0:
-                                visible = desc[:last_break+1].strip()
-                                overflow_text = desc[last_break+1:].strip()
-                                caption += f"📝 **Info:**\n{visible}\n\n⬇️ **(See next message)**"
-                                need_overflow = True
-                            else:
-                                caption += f"📝 **Info:**\n{candidate}..."
-                                overflow_text = desc[remaining:]
-                                need_overflow = True
+                        # Save cleaned description for splitting later
+                        full_desc = desc
             else:
                 # Fallback for when no metadata is found
                 caption = f"**{title}**"
+                full_desc = ""
 
 
-            print(f"\n{'='*60}")
+            print(f"{'='*60}")
             print(f"[{i}/{total_files}] Processing: {title}")
             print(f"📄 Generated Caption Preview:\n{caption[:200]}...")
             if meta:
@@ -816,14 +839,21 @@ async def main():
             
             processing_needed = True
             if os.path.exists(output_path):
-                if is_video_valid(output_path):
-                    print(f"✅ Pre-processed file exists and is valid: {output_path}")
+                from src.video_utils import get_video_info
+                v_info = get_video_info(output_path)
+                curr_h = v_info.get('height', 0) if v_info else 0
+                
+                # Check validity AND resolution (don't reuse if it's high-res 4K when we want 720)
+                if is_video_valid(output_path) and (curr_h <= args.res + 50): # +50 for small variations
+                    print(f"✅ Pre-processed file exists and resolution is correct ({curr_h}p): {output_path}")
                     processing_needed = False
                     processed_files = [output_path]
                 else:
-                    print(f"⚠️ Pre-processed file is invalid/corrupted. Re-processing: {output_path}")
+                    reason = f"wrong resolution ({curr_h}p)" if is_video_valid(output_path) else "invalid/corrupted"
+                    print(f"⚠️ Pre-processed file is {reason}. Re-processing...")
                     try: os.remove(output_path)
                     except: pass
+                
                 # Decide upload method for existing file
                 if not processing_needed:
                     file_size_mb = os.path.getsize(output_path) / (1024 * 1024)
@@ -881,6 +911,34 @@ async def main():
                     print(f"   Skipping this video to maintain professional quality.")
                     failed_count += 1
                     continue
+
+            # Finalize Caption and Split if needed
+            if full_desc:
+                # Standard Telegram limit for media captions is 1024 characters.
+                # Premium accounts support 2048, but we use 1024 for universal compatibility.
+                caption_limit = 1024
+                current_len = len(caption) + len("📝 **Info:**\n")
+                remaining = caption_limit - current_len - 50 # Safe margin
+
+                if len(full_desc) <= remaining:
+                    caption += f"📝 **Info:**\n{full_desc}"
+                else:
+                    # Smart Split
+                    candidate = full_desc[:remaining]
+                    last_break = candidate.rfind('\n\n')
+                    if last_break < remaining * 0.5: last_break = max(candidate.rfind('. '), candidate.rfind('? '), candidate.rfind('! '))
+                    if last_break < remaining * 0.5: last_break = candidate.rfind('\n')
+                    if last_break < remaining * 0.5: last_break = candidate.rfind(' ')
+                    
+                    if last_break > 0:
+                        visible = full_desc[:last_break+1].strip()
+                        overflow_text = full_desc[last_break+1:].strip()
+                        caption += f"📝 **Info:**\n{visible}\n\n⬇️ **(See next message)**"
+                        need_overflow = True
+                    else:
+                        caption += f"📝 **Info:**\n{candidate}..."
+                        overflow_text = full_desc[remaining:]
+                        need_overflow = True
 
             if upload_method == "user":
                  # User usually has 1 file
@@ -950,24 +1008,15 @@ async def main():
                             print(f"   🗑️ Removed: {os.path.basename(f_path)}")
                     except Exception as e:
                         print(f"   ⚠️ Cleanup failed for {f_path}: {e}")
-            if pbar:
-                pbar.update(1)
 
             # Delay between videos
             if i < total_files:
-                delay = 120 if upload_method == "user" else 30  # Longer delay for User Account
-                if pbar:
-                    for _ in range(delay):
-                        time_left = delay - _
-                        pbar.set_description(f"⏳ Cooling down ({time_left}s)...")
-                        await asyncio.sleep(1)
-                else:
-                    print(f"⏳ Waiting {delay} seconds...")
+                # Simple cooldown wait
+                delay = 48
+                print(f"⏳ Waiting {delay} seconds...")
+                await asyncio.sleep(delay)
         
-        if pbar:
-            pbar.close()
-        
-        print(f"\n{'='*60}")
+        print(f"{'='*60}")
         print(f"📊 Summary:")
         print(f"   📁 Total: {total_files}")
         print(f"   ✅ Successful: {processed_count}")
@@ -992,7 +1041,7 @@ async def main():
         print("\n⚠️ Stopped by Ctrl+C")
     except Exception as e:
         if "database disk image is malformed" in str(e).lower():
-            print(f"\n❌ CRITICAL ERROR: Telegram session database is corrupted.")
+            print(f"❌ CRITICAL ERROR: Telegram session database is corrupted.")
             print(f"👉 Fix: Run 'rm scripts/hybrid_account.session' and try again.")
         else:
             print(f"❌ Unexpected Error: {str(e)}")

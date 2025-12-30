@@ -31,9 +31,11 @@ Fetches physical media files.
 
 ### Phase 3: Upload
 ```bash
-./upload.sh --res 720 --intro
+./upload.sh --res 720 --index-offset 105
 ```
 Handles re-encoding and delivery to Telegram.
+*   **Auto-Indexing**: Automatically generates/updates the Table of Contents.
+*   **Index Offset**: Use `--index-offset` to start the index from a specific message ID (e.g., to overwrite a placeholder).
 
 ---
 

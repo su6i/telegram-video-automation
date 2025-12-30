@@ -22,40 +22,47 @@ def detect_hw_encoder():
     Returns the best available encoder with automatic fallback.
     
     Priority:
-    1. h264_videotoolbox (Apple Silicon / Intel Mac - very fast)
-    2. h264_nvenc (NVIDIA GPU)
-    3. h264_qsv (Intel QuickSync)
-    4. libx264 (CPU fallback - always works)
+    1. hevc_videotoolbox (Apple Silicon / Intel Mac - HEVC - very efficient)
+    2. h264_videotoolbox (Apple Silicon / Intel Mac - fast)
+    3. h264_nvenc (NVIDIA GPU)
+    4. libx265 (CPU - HEVC)
+    5. libx264 (CPU fallback)
     """
     global _hw_encoder_cache
     
     if _hw_encoder_cache is not None:
         return _hw_encoder_cache
-    
     try:
         result = subprocess.run(
-            ['ffmpeg', '-hide_banner', '-encoders'],
+            ['ffmpeg', '-encoders'],
             capture_output=True, text=True, timeout=10
         )
+        # Show FFmpeg banner/version info to terminal as requested
+        if result.stderr:
+            print(result.stderr.split("  libavutil")[0]) # Show the main banner part
+            
         encoders = result.stdout
         
         # Check in priority order
-        if 'h264_videotoolbox' in encoders:
+        if 'hevc_videotoolbox' in encoders:
+            _hw_encoder_cache = 'hevc_videotoolbox'
+            print("⚡ Hardware acceleration: Apple HEVC/VideoToolbox (GPU high efficiency)")
+        elif 'h264_videotoolbox' in encoders:
             _hw_encoder_cache = 'h264_videotoolbox'
-            print("⚡ Hardware acceleration: Apple VideoToolbox (GPU encoding)")
+            print("⚡ Hardware acceleration: Apple H.264/VideoToolbox (GPU encoding)")
         elif 'h264_nvenc' in encoders:
             _hw_encoder_cache = 'h264_nvenc'
             print("⚡ Hardware acceleration: NVIDIA NVENC (GPU encoding)")
-        elif 'h264_qsv' in encoders:
-            _hw_encoder_cache = 'h264_qsv'
-            print("⚡ Hardware acceleration: Intel QuickSync (GPU encoding)")
+        elif 'libx265' in encoders:
+            _hw_encoder_cache = 'libx265'
+            print("ℹ️ Using HEVC CPU encoding (libx265) - slow but efficient")
         else:
             _hw_encoder_cache = 'libx264'
-            print("ℹ️ Using CPU encoding (libx264) - this will be slower")
+            print("ℹ️ Using CPU encoding (libx264)")
             
     except Exception:
         _hw_encoder_cache = 'libx264'
-        print("ℹ️ Using CPU encoding (libx264) - this will be slower")
+        print("ℹ️ Using CPU encoding (libx264)")
     
     return _hw_encoder_cache
 
@@ -118,7 +125,7 @@ def is_video_valid(video_path):
         return False
     try:
         cmd = ["ffprobe", "-v", "error", "-show_entries", "format=duration", "-of", "default=noprint_wrappers=1:nokey=1", video_path]
-        result = subprocess.run(cmd, capture_output=True, text=True, timeout=15)
+        result = subprocess.run(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, text=True, timeout=15)
         return result.returncode == 0
     except:
         return False
@@ -230,7 +237,7 @@ def create_intro_video(title, output_intro_path, font_path="src/fonts/Vazir-Bold
             output_intro_path
         ]
         
-        subprocess.run(cmd, capture_output=True, check=True)
+        subprocess.run(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, check=True)
         
         # Delete temporary image
         if os.path.exists(temp_image):
@@ -257,7 +264,7 @@ def extract_thumbnail(video_path, output_thumb_path, timestamps=["00:00:05", "00
                 output_thumb_path
             ]
             # Use capture_output to keep logs clean
-            result = subprocess.run(cmd, capture_output=True, timeout=30)
+            result = subprocess.run(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=30)
             if result.returncode == 0 and os.path.exists(output_thumb_path) and os.path.getsize(output_thumb_path) > 0:
                 return True
         except:
@@ -317,6 +324,7 @@ async def process_video_for_bot_safe(input_path, output_path, title, add_intro=F
             intro_created = create_intro_video(title, intro_path)
         
         # تعیین resolution
+        # ✅ Standardized: Always use Fixed Dimensions (1280x720 or 1920x1080)
         if target_res == 1080:
             target_w, target_h = 1920, 1080
         else:
@@ -334,10 +342,8 @@ async def process_video_for_bot_safe(input_path, output_path, title, add_intro=F
                 "-i", intro_path,
                 "-i", input_path,
                 "-filter_complex", 
-                f"[0:v:0]fps=25,scale={target_w}:{target_h}:force_original_aspect_ratio=decrease,"
-                f"pad={target_w}:{target_h}:(ow-iw)/2:(oh-ih)/2,setsar=1[v0];"
-                f"[1:v:0]fps=25,scale={target_w}:{target_h}:force_original_aspect_ratio=decrease,"
-                f"pad={target_w}:{target_h}:(ow-iw)/2:(oh-ih)/2,setsar=1[v1];"
+                f"[0:v:0]fps=25,scale={target_w}:{target_h}:force_original_aspect_ratio=decrease,pad={target_w}:{target_h}:(ow-iw)/2:(oh-ih)/2,setsar=1[v0];"
+                f"[1:v:0]fps=25,scale={target_w}:{target_h}:force_original_aspect_ratio=decrease,pad={target_w}:{target_h}:(ow-iw)/2:(oh-ih)/2,setsar=1[v1];"
                 f"[0:a:0]aresample=44100,aformat=sample_fmts=fltp:channel_layouts=stereo[a0];"
                 f"[1:a:0]aresample=44100,aformat=sample_fmts=fltp:channel_layouts=stereo[a1];"
                 f"[v0][a0][v1][a1]concat=n=2:v=1:a=1[outv][outa]",
@@ -345,11 +351,17 @@ async def process_video_for_bot_safe(input_path, output_path, title, add_intro=F
                 "-c:v", encoder,  # ✅ Auto hardware acceleration
                 "-c:a", "aac",
             ]
-            # Add encoder-specific options
-            if encoder == 'libx264':
+            # Encoder-specific options
+            if encoder in ['hevc_videotoolbox', 'libx265']:
+                process_cmd.extend(["-tag:v", "hvc1"])
+                if encoder == 'hevc_videotoolbox':
+                    process_cmd.extend(["-q:v", "60"])
+                else:
+                    process_cmd.extend(["-crf", "25", "-preset", "fast"])
+            elif encoder in ['hevc_videotoolbox', 'h264_videotoolbox', 'libx265']:
+                process_cmd.extend(["-q:v", "65"])
+            elif encoder == 'libx264':
                 process_cmd.extend(["-preset", "fast", "-crf", "23"])
-            elif encoder == 'h264_videotoolbox':
-                process_cmd.extend(["-q:v", "65"])  # Quality for VideoToolbox
             else:
                 process_cmd.extend(["-preset", "fast"])
             
@@ -359,43 +371,51 @@ async def process_video_for_bot_safe(input_path, output_path, title, add_intro=F
                 output_path
             ])
         else:
-            # ✅ Without intro: Still Scale!
-            orig_info = get_video_info(input_path)
-            orig_w = orig_info.get('width', 1920) if orig_info else 1920
-            orig_h = orig_info.get('height', 1080) if orig_info else 1080
-            
-            print(f"   🔄 Re-encoding {orig_w}x{orig_h} → {target_w}x{target_h}...")
+            # ✅ Without intro: Detect hardware encoder
+            encoder = detect_hw_encoder()
             
             process_cmd = [
                 "ffmpeg", "-y",
                 "-i", input_path,
-                "-vf", (
-                    f"fps=25,scale={target_w}:{target_h}:force_original_aspect_ratio=decrease,"
-                    f"pad={target_w}:{target_h}:(ow-iw)/2:(oh-ih)/2,setsar=1"
-                ),
-                "-c:v", "libx264",
+                "-vf", f"fps=25,scale={target_w}:{target_h}:force_original_aspect_ratio=decrease,pad={target_w}:{target_h}:(ow-iw)/2:(oh-ih)/2,setsar=1",
+                "-c:v", encoder,
                 "-af", "aresample=44100,aformat=sample_fmts=fltp:channel_layouts=stereo",
                 "-c:a", "aac",
-                "-preset", "medium",
-                "-crf", "23",
+            ]
+            
+            # Encoder-specific options
+            if encoder in ["hevc_videotoolbox", "libx265"]:
+                process_cmd.extend(["-tag:v", "hvc1"])
+                if encoder == "hevc_videotoolbox":
+                    process_cmd.extend(["-q:v", "60"])
+                else:
+                    process_cmd.extend(["-crf", "25", "-preset", "fast"])
+            elif encoder == "h264_videotoolbox":
+                process_cmd.extend(["-q:v", "65"])
+            elif encoder == "libx264":
+                process_cmd.extend(["-preset", "medium", "-crf", "23"])
+            else:
+                process_cmd.extend(["-preset", "fast"])
+
+            process_cmd.extend([
                 "-pix_fmt", "yuv420p",
                 "-movflags", "+faststart",
                 output_path
-            ]
+            ])
         
-        # ✅ Show ffmpeg progress in terminal
         result = subprocess.run(
             process_cmd, 
-            stdout=None,  # Show output
-            stderr=None,  # Show progress
+            stdout=None,
+            stderr=None,
             timeout=1200
         )
         
         if intro_created and os.path.exists(intro_path):
             os.remove(intro_path)
-        
+            
         if result.returncode != 0:
             print(f"   ❌ ffmpeg error (code {result.returncode})")
+            print(f"   DEBUG - CMD: {' '.join(process_cmd)}")
             return False
         
         if os.path.exists(output_path) and os.path.getsize(output_path) > 1000:
@@ -435,24 +455,11 @@ async def process_video_for_user_safe(input_path, output_path, title, add_intro=
         print(f"👤 Processing for user account - {title}")
         print(f"   📏 Original size: {file_size_mb:.2f}MB")
         
-        # ✅ Step 1: Detect aspect ratio
-        orig_w, orig_h, sar = get_video_info_detailed(input_path)
-        aspect_ratio = (orig_w / orig_h) if orig_h > 0 else 1.777
-        print(f"   📐 Original: {orig_w}x{orig_h} | SAR: {sar} | Aspect: {aspect_ratio:.2f}")
-        
-        # ✅ USER ACCOUNT: HD (1280x720) یا 4K (1920x1080)
-        # Portrait vs Landscape detection
-        if aspect_ratio < 1:
-            if target_res == 1080:
-                target_w, target_h = 1080, 1920
-            else:
-                target_w, target_h = 720, 1280
-            print(f"   🔄 Portrait detected - {target_w}x{target_h}")
+        # ✅ Standardized: Always use Fixed Dimensions (1280x720 or 1920x1080)
+        if target_res == 1080:
+            target_w, target_h = 1920, 1080
         else:
-            if target_res == 1080:
-                target_w, target_h = 1920, 1080
-            else:
-                target_w, target_h = 1280, 720
+            target_w, target_h = 1280, 720
             print(f"   🔄 Landscape detected - {target_w}x{target_h}")
         
         intro_path = f"intro_user_{os.path.basename(input_path)}"
@@ -473,10 +480,8 @@ async def process_video_for_user_safe(input_path, output_path, title, add_intro=
                 "-i", intro_path,
                 "-i", input_path,
                 "-filter_complex", 
-                f"[0:v:0]fps=25,scale={target_w}:{target_h}:force_original_aspect_ratio=decrease,"
-                f"pad={target_w}:{target_h}:(ow-iw)/2:(oh-ih)/2,setsar=1[v0];"
-                f"[1:v:0]fps=25,scale={target_w}:{target_h}:force_original_aspect_ratio=decrease,"
-                f"pad={target_w}:{target_h}:(ow-iw)/2:(oh-ih)/2,setsar=1[v1];"
+                f"[0:v:0]fps=25,scale={target_w}:{target_h}:force_original_aspect_ratio=decrease,pad={target_w}:{target_h}:(ow-iw)/2:(oh-ih)/2,setsar=1[v0];"
+                f"[1:v:0]fps=25,scale={target_w}:{target_h}:force_original_aspect_ratio=decrease,pad={target_w}:{target_h}:(ow-iw)/2:(oh-ih)/2,setsar=1[v1];"
                 f"[0:a:0]aresample=44100,aformat=sample_fmts=fltp:channel_layouts=stereo[a0];"
                 f"[1:a:0]aresample=44100,aformat=sample_fmts=fltp:channel_layouts=stereo[a1];"
                 f"[v0][a0][v1][a1]concat=n=2:v=1:a=1[outv][outa]",
@@ -484,11 +489,17 @@ async def process_video_for_user_safe(input_path, output_path, title, add_intro=
                 "-c:v", encoder,  # ✅ Auto hardware acceleration
                 "-c:a", "aac",
             ]
-            # Add encoder-specific options
-            if encoder == 'libx264':
+            # Encoder-specific options
+            if encoder in ['hevc_videotoolbox', 'libx265']:
+                process_cmd.extend(["-tag:v", "hvc1"])
+                if encoder == 'hevc_videotoolbox':
+                    process_cmd.extend(["-q:v", "60"])
+                else:
+                    process_cmd.extend(["-crf", "25", "-preset", "fast"])
+            elif encoder in ['hevc_videotoolbox', 'h264_videotoolbox', 'libx265']:
+                process_cmd.extend(["-q:v", "65"])
+            elif encoder == 'libx264':
                 process_cmd.extend(["-preset", "fast", "-crf", "23"])
-            elif encoder == 'h264_videotoolbox':
-                process_cmd.extend(["-q:v", "65"])  # Quality for VideoToolbox
             else:
                 process_cmd.extend(["-preset", "fast"])
             
@@ -498,39 +509,51 @@ async def process_video_for_user_safe(input_path, output_path, title, add_intro=
                 output_path
             ])
         else:
-            # ✅ Without intro: Still Scale!
-            print(f"   🔄 Re-encoding {orig_w}x{orig_h} → {target_w}x{target_h}...")
+            # ✅ Without intro: Detect hardware encoder
+            encoder = detect_hw_encoder()
             
             process_cmd = [
                 "ffmpeg", "-y",
                 "-i", input_path,
-                "-vf", (
-                    f"fps=25,scale={target_w}:{target_h}:force_original_aspect_ratio=decrease,"
-                    f"pad={target_w}:{target_h}:(ow-iw)/2:(oh-ih)/2,setsar=1"
-                ),
-                "-c:v", "libx264",
+                "-vf", f"fps=25,scale={target_w}:{target_h}:force_original_aspect_ratio=decrease,pad={target_w}:{target_h}:(ow-iw)/2:(oh-ih)/2,setsar=1",
+                "-c:v", encoder,
                 "-af", "aresample=44100,aformat=sample_fmts=fltp:channel_layouts=stereo",
                 "-c:a", "aac",
-                "-preset", "medium",
-                "-crf", "23",
+            ]
+            
+            # Encoder-specific options
+            if encoder in ["hevc_videotoolbox", "libx265"]:
+                process_cmd.extend(["-tag:v", "hvc1"])
+                if encoder == "hevc_videotoolbox":
+                    process_cmd.extend(["-q:v", "60"])
+                else:
+                    process_cmd.extend(["-crf", "25", "-preset", "fast"])
+            elif encoder == "h264_videotoolbox":
+                process_cmd.extend(["-q:v", "65"])
+            elif encoder == "libx264":
+                process_cmd.extend(["-preset", "medium", "-crf", "23"])
+            else:
+                process_cmd.extend(["-preset", "fast"])
+
+            process_cmd.extend([
                 "-pix_fmt", "yuv420p",
                 "-movflags", "+faststart",
                 output_path
-            ]
+            ])
         
-        # ✅ Show ffmpeg progress in terminal (stdout=None, stderr=None)
         result = subprocess.run(
             process_cmd, 
-            stdout=None,  # Show output
-            stderr=None,  # Show progress
+            stdout=None,
+            stderr=None,
             timeout=1800
         )
         
         if intro_created and os.path.exists(intro_path):
             os.remove(intro_path)
-        
+            
         if result.returncode != 0:
             print(f"   ❌ ffmpeg error (code {result.returncode})")
+            print(f"   DEBUG - CMD: {' '.join(process_cmd)}")
             return False
         
         if os.path.exists(output_path) and os.path.getsize(output_path) > 1000:
@@ -555,40 +578,7 @@ async def process_video_for_user_safe(input_path, output_path, title, add_intro=
 
 
 
-def get_video_sar(input_path):
-    """Extract aspect ratio information, accounting for rotation."""
-    try:
-        cmd = [
-            "ffprobe", "-v", "error",
-            "-select_streams", "v:0",
-            "-show_entries", "stream=width,height,sample_aspect_ratio:stream_tags=rotate",
-            "-of", "json",
-            input_path
-        ]
-        result = subprocess.run(cmd, capture_output=True, text=True, timeout=30)
-        data = json.loads(result.stdout)
-        
-        if data['streams']:
-            stream = data['streams'][0]
-            width = int(stream.get('width', 1280))
-            height = int(stream.get('height', 720))
-            sar = stream.get('sample_aspect_ratio', '1:1')
-            
-            # Check for rotation
-            tags = stream.get('tags', {})
-            rotate = tags.get('rotate', '0')
-            try:
-                rotate = int(rotate)
-            except:
-                rotate = 0
-                
-            # If rotated 90 or 270 degrees, swap width and height
-            if abs(rotate) == 90 or abs(rotate) == 270:
-                width, height = height, width
-                
-            return width, height, sar
-            
-        return 1280, 720, '1:1'
+
     except:
         return 1280, 720, '1:1'
 
@@ -684,8 +674,8 @@ async def split_video_for_bot_safe(input_path, output_dir, title, target_size_mb
                     "-i", input_path,
                     "-t", str(segment_duration), # duration from seek point
                     "-filter_complex",
-                    f"[0:v]fps=25,scale={target_w}:{target_h}:force_original_aspect_ratio=decrease,pad={target_w}:{target_h}:(ow-iw)/2:(oh-ih)/2,setsar=1[v0];"
-                    f"[1:v]fps=25,scale={target_w}:{target_h}:force_original_aspect_ratio=decrease,pad={target_w}:{target_h}:(ow-iw)/2:(oh-ih)/2,setsar=1[v1];"
+                    f"[0:v]fps=25[v0];"
+                    f"[1:v]fps=25[v1];"
                     f"[0:a]aresample=44100,aformat=sample_fmts=fltp:channel_layouts=stereo[a0];"
                     f"[1:a]aresample=44100,aformat=sample_fmts=fltp:channel_layouts=stereo[a1];"
                     f"[v0][a0][v1][a1]concat=n=2:v=1:a=1[outv][outa]",
@@ -714,7 +704,7 @@ async def split_video_for_bot_safe(input_path, output_dir, title, target_size_mb
                 ]
             
             try:
-                result = subprocess.run(split_cmd, capture_output=True, text=True, timeout=300)
+                result = subprocess.run(split_cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, text=True, timeout=300)
                 
                 if result.returncode == 0 and os.path.exists(output_path) and os.path.getsize(output_path) > 1000:
                     part_size = os.path.getsize(output_path) / (1024 * 1024)
@@ -785,8 +775,8 @@ async def split_video_for_user_safe(input_path, output_dir, title, target_size_m
                     "-i", input_path,
                     "-t", str(segment_duration),
                     "-filter_complex",
-                    f"[0:v]fps=25,scale={target_w}:{target_h}:force_original_aspect_ratio=decrease,pad={target_w}:{target_h}:(ow-iw)/2:(oh-ih)/2,setsar=1[v0];"
-                    f"[1:v]fps=25,scale={target_w}:{target_h}:force_original_aspect_ratio=decrease,pad={target_w}:{target_h}:(ow-iw)/2:(oh-ih)/2,setsar=1[v1];"
+                    f"[0:v]fps=25[v0];"
+                    f"[1:v]fps=25[v1];"
                     f"[0:a]aresample=44100,aformat=sample_fmts=fltp:channel_layouts=stereo[a0];"
                     f"[1:a]aresample=44100,aformat=sample_fmts=fltp:channel_layouts=stereo[a1];"
                     f"[v0][a0][v1][a1]concat=n=2:v=1:a=1[outv][outa]",
@@ -812,7 +802,7 @@ async def split_video_for_user_safe(input_path, output_dir, title, target_size_m
                 ]
             
             try:
-                result = subprocess.run(split_cmd, capture_output=True, text=True, timeout=600)
+                result = subprocess.run(split_cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, text=True, timeout=600)
                 if result.returncode == 0 and os.path.exists(output_path) and os.path.getsize(output_path) > 1000:
                     part_size = os.path.getsize(output_path) / (1024 * 1024)
                     print(f"   ✅ Part {i+1} ready - {part_size:.2f}MB")
