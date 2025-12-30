@@ -365,16 +365,16 @@ def format_description_markdown(text):
     # words that should NEVER be a standalone header
     EXCLUDED_WORDS = {'Both', 'His', 'Their', 'Once', 'The', 'And', 'With', 'From', 'This', 'That', 'These', 'Those'}
     
-    # Known header/callout patterns (Restricted to start of line or after newline)
+    # Known header/callout patterns - allow matching inside paragraphs but ensure they get split
     header_patterns = [
-        r'(?m)^ *(Your Robot Buddy)\s+',
-        r'(?m)^ *(Superman)\s+',
-        r'(?m)^ *(Swimming with sharks)\s+',
-        r'(?m)^ *(Game of [Tt]hrones)\s+',
-        r'(?m)^ *(Wizard)\s+(?=an image)',
-        r'(?m)^ *(Pirate)\s+(?=\[insert)',
+        r'\b(Your Robot Buddy)\s+',
+        r'\b(Superman)\s+',
+        r'\b(Swimming with sharks)\s+',
+        r'\b(Game of [Tt]hrones)\s+',
+        r'\b(Wizard)\s+(?=an image)',
+        r'\b(Pirate)\s+(?=\[insert)',
         r'\b(EXTREMELY IMPORTANT!?)\b',
-        r'\b(IMPORTANT!?)\b',
+        r'\b(IMPORTANT NOTE:?|IMPORTANT!?)\b',
         r'\b(NOTE:?)\b',
         r'\b(TIP:?)\b',
         r'\b(WARNING!?)\b',
