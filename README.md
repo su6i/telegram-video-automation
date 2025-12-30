@@ -37,11 +37,11 @@ The system is designed to be a fully automated bridge between web content and Te
 1. **🔍 Scan**: Initializes the mapping of content hierarchy and metadata via `scraper.py`.
 2. **📥 Download**: Asynchronously fetches media assets into the local environment.
 3. **🚀 Upload**: A high-performance pipeline featuring:
-   - ⚡ **Fast Stream Copy**: No re-encoding when possible (processes 3GB files in ~2 minutes)
-   - 🎬 **Smart Intro Generation**: Optional title cards with automatic re-encoding
-   - 📐 **Correct Aspect Ratio**: Proper width/height metadata for both Bot and User uploads
-   - 🔗 **Intelligent Link Placement**: Links are embedded inline within descriptions
-   - 🖥️ **Auto Hardware Acceleration**: Detects Apple/NVIDIA/Intel GPU, falls back to CPU
+   - ⚡ **Strict Resolution Control**: Automatically scales and pads videos to **720p (1280x720)** or 1080p, strictly preserving original aspect ratios.
+   - 📝 **Structured Captioning**: Smart formatting of descriptions with bold headers (e.g., *Lesson Recap*) and list preservation.
+   - 📄 **Automatic Overflow**: Descriptions exceeding 1024 characters are automatically split and continued as a reply message.
+   - 🎬 **Smart Intro Generation**: Optional title cards with automatic re-encoding only when necessary.
+   - 🏎️ **HEVC & HW Acceleration**: Prioritizes **H.265 (HEVC)** encoding with hardware acceleration (e.g., `hevc_videotoolbox` for Mac) for 50-70% file size reduction.
 
 ---
 
