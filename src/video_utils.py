@@ -48,8 +48,19 @@ def get_video_info(input_path):
         
         return None
     except Exception as e:
-        print(f"Error getting video info: {str(e)}")
+        # print(f"Error getting video info: {str(e)}") # Suppress noise
         return None
+
+def is_video_valid(video_path):
+    """Check if video file is valid and can be opened by ffmpeg/ffprobe."""
+    if not os.path.exists(video_path) or os.path.getsize(video_path) < 1000:
+        return False
+    try:
+        cmd = ["ffprobe", "-v", "error", "-show_entries", "format=duration", "-of", "default=noprint_wrappers=1:nokey=1", video_path]
+        result = subprocess.run(cmd, capture_output=True, text=True, timeout=15)
+        return result.returncode == 0
+    except:
+        return False
 
 def get_smart_title(input_path):
     """
@@ -169,22 +180,28 @@ def create_intro_video(title, output_intro_path, font_path="src/fonts/Vazir-Bold
         print(f"❌ Error creating intro: {e}")
         return False
 
-def extract_thumbnail(video_path, output_thumb_path, timestamp="00:00:05"):
-    """Extract a thumbnail from the video at a specific timestamp."""
-    try:
-        cmd = [
-            "ffmpeg", "-y",
-            "-ss", timestamp,
-            "-i", video_path,
-            "-vframes", "1",
-            "-q:v", "2",
-            output_thumb_path
-        ]
-        subprocess.run(cmd, capture_output=True, check=True)
-        return True
-    except Exception as e:
-        print(f"⚠️ Could not extract thumbnail: {e}")
-        return False
+def extract_thumbnail(video_path, output_thumb_path, timestamps=["00:00:05", "00:00:01", "00:00:10"]):
+    """
+    Extract a thumbnail from the video. 
+    Tries multiple timestamps if one fails.
+    """
+    for ts in timestamps:
+        try:
+            cmd = [
+                "ffmpeg", "-y",
+                "-ss", ts,
+                "-i", video_path,
+                "-vframes", "1",
+                "-q:v", "2",
+                output_thumb_path
+            ]
+            # Use capture_output to keep logs clean
+            result = subprocess.run(cmd, capture_output=True, timeout=30)
+            if result.returncode == 0 and os.path.exists(output_thumb_path) and os.path.getsize(output_thumb_path) > 0:
+                return True
+        except:
+            continue
+    return False
 
 def add_intro_to_video(video_path, title, output_path):
     """Add intro to the beginning of the video."""
@@ -218,8 +235,14 @@ def add_intro_to_video(video_path, title, output_path):
         print(f"Error adding intro: {e}")
         return False
 
+
+
 async def process_video_for_bot_safe(input_path, output_path, title, add_intro=False, target_res=720):
-    """Process video for bot (safer version) + optional intro"""
+    """
+    Process video for bot (safer version) + optional intro
+    ✅ استفاده کامل filter_complex + صحیح stream selection
+    ✅ بهتر error handling و logging
+    """
     try:
         file_size_mb = os.path.getsize(input_path) / (1024 * 1024)
         
@@ -230,87 +253,199 @@ async def process_video_for_bot_safe(input_path, output_path, title, add_intro=F
         intro_path = f"intro_{os.path.basename(input_path)}"
 
         if add_intro:
-             # Create intro
             intro_created = create_intro_video(title, intro_path)
         
+        # تعیین resolution
+        if target_res == 1080:
+            target_w, target_h = 1920, 1080
+        else:
+            target_w, target_h = 1280, 720
+        
         if intro_created:
-            print("   🎞️ Intro created.")
-            # Use filter_complex for concatenation
-            # We need to scale inputs to match (e.g., 1280x720 is good for bot)
-            # scale=1280:720:force_original_aspect_ratio=decrease,pad=1280:720:(ow-iw)/2:(oh-ih)/2
+            print("   🎞️ Intro created - re-encoding required...")
             
-            # For reliability, force both to a specific size (e.g. HD Ready)
-            if target_res == 1080:
-                target_w, target_h = 1920, 1080
-            else:
-                target_w, target_h = 1280, 720
-            
+            # ✅ filter_complex برای concat intro + main video
             process_cmd = [
                 "ffmpeg", "-y",
                 "-i", intro_path,
                 "-i", input_path,
                 "-filter_complex", 
-                f"[0:v]fps=25,scale={target_w}:{target_h}:force_original_aspect_ratio=decrease,pad={target_w}:{target_h}:(ow-iw)/2:(oh-ih)/2,setsar=1[v0];"
-                f"[1:v]fps=25,scale={target_w}:{target_h}:force_original_aspect_ratio=decrease,pad={target_w}:{target_h}:(ow-iw)/2:(oh-ih)/2,setsar=1[v1];"
-                f"[0:a]aresample=44100,aformat=sample_fmts=fltp:channel_layouts=stereo[a0];"
-                f"[1:a]aresample=44100,aformat=sample_fmts=fltp:channel_layouts=stereo[a1];"
+                f"[0:v:0]fps=25,scale={target_w}:{target_h}:force_original_aspect_ratio=decrease,"
+                f"pad={target_w}:{target_h}:(ow-iw)/2:(oh-ih)/2,setsar=1[v0];"
+                f"[1:v:0]fps=25,scale={target_w}:{target_h}:force_original_aspect_ratio=decrease,"
+                f"pad={target_w}:{target_h}:(ow-iw)/2:(oh-ih)/2,setsar=1[v1];"
+                f"[0:a:0]aresample=44100,aformat=sample_fmts=fltp:channel_layouts=stereo[a0];"
+                f"[1:a:0]aresample=44100,aformat=sample_fmts=fltp:channel_layouts=stereo[a1];"
                 f"[v0][a0][v1][a1]concat=n=2:v=1:a=1[outv][outa]",
                 "-map", "[outv]", "-map", "[outa]",
                 "-c:v", "libx264",
                 "-c:a", "aac",
-                "-preset", "medium",
+                "-preset", "fast",
                 "-crf", "23",
                 "-pix_fmt", "yuv420p",
                 "-movflags", "+faststart",
                 output_path
             ]
         else:
-            if target_res == 1080:
-                target_w, target_h = 1920, 1080
-            else:
-                target_w, target_h = 1280, 720
-            # Fallback to normal processing
+            # ✅ WITHOUT intro: use STREAM COPY (super fast!)
+            print(f"   ⚡ No intro - using fast stream copy...")
             process_cmd = [
                 "ffmpeg", "-y",
                 "-i", input_path,
-                "-vf", f"fps=25,scale={target_w}:{target_h}:force_original_aspect_ratio=decrease,pad={target_w}:{target_h}:(ow-iw)/2:(oh-ih)/2,setsar=1",
-                "-c:v", "libx264",
-                "-af", "aresample=44100,aformat=sample_fmts=fltp:channel_layouts=stereo",
-                "-c:a", "aac",
-                "-preset", "medium",
-                "-crf", "23",
-                "-pix_fmt", "yuv420p",
+                "-c", "copy",  # ✅ FAST: Just copy, no re-encode!
                 "-movflags", "+faststart",
                 output_path
             ]
         
+        # ✅ Show ffmpeg progress in terminal
         result = subprocess.run(
             process_cmd, 
-            capture_output=True, 
-            text=True,
-            timeout=900 # 15 minutes (since it's re-encode)
+            stdout=None,  # Show output
+            stderr=None,  # Show progress
+            timeout=1200
         )
         
         if intro_created and os.path.exists(intro_path):
             os.remove(intro_path)
         
         if result.returncode != 0:
-            print(f"   ❌ ffmpeg error (code {result.returncode}):")
-            print(f"   📝 stderr: {result.stderr[-300:]}")
+            print(f"   ❌ ffmpeg error (code {result.returncode})")
             return False
         
         if os.path.exists(output_path) and os.path.getsize(output_path) > 1000:
             new_size = os.path.getsize(output_path) / (1024 * 1024)
-            print(f"   ✅ Processing successful - Size: {new_size:.2f}MB")
+            final_w, final_h, _ = get_video_info_detailed(output_path)
+            print(f"   ✅ Success - Size: {new_size:.2f}MB, Final: {final_w}x{final_h}")
             return True
+        else:
+            print(f"   ❌ Output file not created or too small")
+            return False
         
+    except subprocess.TimeoutExpired:
+        print(f"   ❌ Processing timeout (20 minutes exceeded)")
+        if 'intro_created' in locals() and intro_created and os.path.exists(intro_path):
+            os.remove(intro_path)
         return False
-        
     except Exception as e:
         print(f"   ❌ Processing error: {str(e)}")
-        # Cleanup intro if exists
-        #if os.path.exists(intro_path): os.remove(intro_path)
+        if 'intro_created' in locals() and intro_created and os.path.exists(intro_path):
+            os.remove(intro_path)
         return False
+
+
+async def process_video_for_user_safe(input_path, output_path, title, add_intro=False, target_res=720):
+    """
+    Process video for USER ACCOUNT (supports custom resolution: 720 or 1080)
+    ✅ استفاده کامل filter_complex - metadata صحیح!
+    ✅ صریح stream selection
+    ✅ بهتر progress tracking و error handling
+    
+    Note: This function is for User Accounts!
+    Bot accounts should use process_video_for_bot_safe (1280x720)
+    """
+    try:
+        file_size_mb = os.path.getsize(input_path) / (1024 * 1024)
+        
+        print(f"👤 Processing for user account - {title}")
+        print(f"   📏 Original size: {file_size_mb:.2f}MB")
+        
+        # ✅ Step 1: Detect aspect ratio
+        orig_w, orig_h, sar = get_video_info_detailed(input_path)
+        aspect_ratio = (orig_w / orig_h) if orig_h > 0 else 1.777
+        print(f"   📐 Original: {orig_w}x{orig_h} | SAR: {sar} | Aspect: {aspect_ratio:.2f}")
+        
+        # ✅ USER ACCOUNT: HD (1280x720) یا 4K (1920x1080)
+        # Portrait vs Landscape detection
+        if aspect_ratio < 1:
+            if target_res == 1080:
+                target_w, target_h = 1080, 1920
+            else:
+                target_w, target_h = 720, 1280
+            print(f"   🔄 Portrait detected - {target_w}x{target_h}")
+        else:
+            if target_res == 1080:
+                target_w, target_h = 1920, 1080
+            else:
+                target_w, target_h = 1280, 720
+            print(f"   🔄 Landscape detected - {target_w}x{target_h}")
+        
+        intro_path = f"intro_user_{os.path.basename(input_path)}"
+        intro_created = False
+        
+        if add_intro:
+            intro_created = create_intro_video(title, intro_path)
+        
+        if intro_created:
+            # ✅ With intro: re-encode needed for concat
+            print(f"   🎞️ Intro created - re-encoding required...")
+            process_cmd = [
+                "ffmpeg", "-y",
+                "-i", intro_path,
+                "-i", input_path,
+                "-filter_complex", 
+                f"[0:v:0]fps=25,scale={target_w}:{target_h}:force_original_aspect_ratio=decrease,"
+                f"pad={target_w}:{target_h}:(ow-iw)/2:(oh-ih)/2,setsar=1[v0];"
+                f"[1:v:0]fps=25,scale={target_w}:{target_h}:force_original_aspect_ratio=decrease,"
+                f"pad={target_w}:{target_h}:(ow-iw)/2:(oh-ih)/2,setsar=1[v1];"
+                f"[0:a:0]aresample=44100,aformat=sample_fmts=fltp:channel_layouts=stereo[a0];"
+                f"[1:a:0]aresample=44100,aformat=sample_fmts=fltp:channel_layouts=stereo[a1];"
+                f"[v0][a0][v1][a1]concat=n=2:v=1:a=1[outv][outa]",
+                "-map", "[outv]", "-map", "[outa]",
+                "-c:v", "libx264",
+                "-c:a", "aac",
+                "-preset", "fast",
+                "-crf", "23",
+                "-pix_fmt", "yuv420p",
+                "-movflags", "+faststart",
+                output_path
+            ]
+        else:
+            # ✅ WITHOUT intro: use STREAM COPY (super fast, no re-encoding!)
+            print(f"   ⚡ No intro - using fast stream copy...")
+            process_cmd = [
+                "ffmpeg", "-y",
+                "-i", input_path,
+                "-c", "copy",  # ✅ FAST: Just copy, no re-encode!
+                "-movflags", "+faststart",
+                output_path
+            ]
+        
+        # ✅ Show ffmpeg progress in terminal (stdout=None, stderr=None)
+        result = subprocess.run(
+            process_cmd, 
+            stdout=None,  # Show output
+            stderr=None,  # Show progress
+            timeout=1800
+        )
+        
+        if intro_created and os.path.exists(intro_path):
+            os.remove(intro_path)
+        
+        if result.returncode != 0:
+            print(f"   ❌ ffmpeg error (code {result.returncode})")
+            return False
+        
+        if os.path.exists(output_path) and os.path.getsize(output_path) > 1000:
+            new_size = os.path.getsize(output_path) / (1024 * 1024)
+            final_w, final_h, _ = get_video_info_detailed(output_path)
+            print(f"   ✅ Success - Size: {new_size:.2f}MB, Final: {final_w}x{final_h}")
+            return True
+        else:
+            print(f"   ❌ Output file not created or too small")
+            return False
+        
+    except subprocess.TimeoutExpired:
+        print(f"   ❌ Processing timeout (30 minutes exceeded)")
+        if 'intro_created' in locals() and intro_created and os.path.exists(intro_path):
+            os.remove(intro_path)
+        return False
+    except Exception as e:
+        print(f"   ❌ Processing error: {str(e)}")
+        if 'intro_created' in locals() and intro_created and os.path.exists(intro_path):
+            os.remove(intro_path)
+        return False
+
+
 
 def get_video_sar(input_path):
     """Extract aspect ratio information, accounting for rotation."""
@@ -348,120 +483,6 @@ def get_video_sar(input_path):
         return 1280, 720, '1:1'
     except:
         return 1280, 720, '1:1'
-
-async def process_video_for_user_safe(input_path, output_path, title, add_intro=False, target_res=720):
-    """
-    Process video for USER ACCOUNT (supports custom resolution: 720 or 1080)
-    
-    Note: This function is for User Accounts!
-    Bot accounts should use process_video_for_bot_safe (1280x720)
-    """
-    try:
-        file_size_mb = os.path.getsize(input_path) / (1024 * 1024)
-        
-        print(f"👤 Processing for user account - {title}")
-        print(f"   📏 Original size: {file_size_mb:.2f}MB")
-        
-        # ✅ Step 1: Detect aspect ratio
-        orig_w, orig_h, sar = get_video_info_detailed(input_path)
-        aspect_ratio = (orig_w / orig_h) if orig_h > 0 else 1.777
-        print(f"   📐 Original: {orig_w}x{orig_h} | SAR: {sar} | Aspect: {aspect_ratio:.2f}")
-        
-        aspect_ratio = (orig_w / orig_h) if orig_h > 0 else 1.777
-        
-        # ✅ USER ACCOUNT: HD (1280x720)
-        # Portrait vs Landscape detection
-        if aspect_ratio < 1:
-            if target_res == 1080:
-                target_w, target_h = 1080, 1920
-            else:
-                target_w, target_h = 720, 1280
-            print(f"   🔄 Portrait detected - {target_w}x{target_h}")
-        else:
-            if target_res == 1080:
-                target_w, target_h = 1920, 1080
-            else:
-                target_w, target_h = 1280, 720
-            print(f"   🔄 Landscape detected - {target_w}x{target_h}")
-        
-        intro_path = f"intro_user_{os.path.basename(input_path)}"
-        intro_created = False
-        
-        if add_intro:
-            intro_created = create_intro_video(title, intro_path)
-        
-        if intro_created:
-            # ✅ With intro: Concat + Scale
-            process_cmd = [
-                "ffmpeg", "-y",
-                "-i", intro_path,
-                "-i", input_path,
-                "-filter_complex", 
-                f"[0:v]fps=25,scale={target_w}:{target_h}:force_original_aspect_ratio=decrease,"
-                f"pad={target_w}:{target_h}:(ow-iw)/2:(oh-ih)/2,setsar=1[v0];"
-                f"[1:v]fps=25,scale={target_w}:{target_h}:force_original_aspect_ratio=decrease,"
-                f"pad={target_w}:{target_h}:(ow-iw)/2:(oh-ih)/2,setsar=1[v1];"
-                f"[0:a]aresample=44100,aformat=sample_fmts=fltp:channel_layouts=stereo[a0];"
-                f"[1:a]aresample=44100,aformat=sample_fmts=fltp:channel_layouts=stereo[a1];"
-                f"[v0][a0][v1][a1]concat=n=2:v=1:a=1[outv][outa]",
-                "-map", "[outv]", "-map", "[outa]",
-                "-c:v", "libx264",
-                "-c:a", "aac",
-                "-preset", "medium",
-                "-crf", "23",
-                "-pix_fmt", "yuv420p",
-                "-movflags", "+faststart",
-                output_path
-            ]
-        else:
-            # ✅ Without intro: Still Scale!
-            process_cmd = [
-                "ffmpeg", "-y",
-                "-i", input_path,
-                "-vf", (
-                    f"fps=25,scale={target_w}:{target_h}:force_original_aspect_ratio=decrease,"
-                    f"pad={target_w}:{target_h}:(ow-iw)/2:(oh-ih)/2,setsar=1"
-                ),
-                "-c:v", "libx264",
-                "-af", "aresample=44100,aformat=sample_fmts=fltp:channel_layouts=stereo",
-                "-c:a", "aac",
-                "-preset", "medium",
-                "-crf", "23",
-                "-pix_fmt", "yuv420p",
-                "-movflags", "+faststart",
-                output_path
-            ]
-            
-        # Using stdout=None to allow ffmpeg progress bar to show in terminal
-        result = subprocess.run(
-            process_cmd, 
-            stdout=None, 
-            stderr=None,
-            timeout=1800
-        )
-        
-        if intro_created and os.path.exists(intro_path):
-            os.remove(intro_path)
-        
-        if result.returncode != 0:
-            print(f"   ❌ ffmpeg error (code {result.returncode})")
-            return False
-        
-        if os.path.exists(output_path) and os.path.getsize(output_path) > 1000:
-            new_size = os.path.getsize(output_path) / (1024 * 1024)
-            final_w, final_h, _ = get_video_info_detailed(output_path)
-            print(f"   ✅ Success - Size: {new_size:.2f}MB, Final: {final_w}x{final_h}")
-            return True
-        
-        return False
-        
-    except subprocess.TimeoutExpired:
-        print(f"   ❌ Processing timeout (30 minutes exceeded)")
-        return False
-    except Exception as e:
-        print(f"   ❌ Processing error: {str(e)}")
-        return False
-
 
 def get_video_info_detailed(input_path):
     """
