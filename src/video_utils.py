@@ -4,6 +4,7 @@ import json
 import math
 import os
 import re
+import shutil
 from PIL import Image, ImageDraw, ImageFont
 import textwrap
 
@@ -11,6 +12,61 @@ import textwrap
 SIZE_THRESHOLD_MB = 45
 BOT_MAX_SIZE_MB = 45
 USER_MAX_SIZE_MB = 1900  # 1.9GB
+
+# Cache for hardware encoder detection
+_hw_encoder_cache = None
+
+def detect_hw_encoder():
+    """
+    Auto-detect available hardware encoder.
+    Returns the best available encoder with automatic fallback.
+    
+    Priority:
+    1. h264_videotoolbox (Apple Silicon / Intel Mac - very fast)
+    2. h264_nvenc (NVIDIA GPU)
+    3. h264_qsv (Intel QuickSync)
+    4. libx264 (CPU fallback - always works)
+    """
+    global _hw_encoder_cache
+    
+    if _hw_encoder_cache is not None:
+        return _hw_encoder_cache
+    
+    try:
+        result = subprocess.run(
+            ['ffmpeg', '-hide_banner', '-encoders'],
+            capture_output=True, text=True, timeout=10
+        )
+        encoders = result.stdout
+        
+        # Check in priority order
+        if 'h264_videotoolbox' in encoders:
+            _hw_encoder_cache = 'h264_videotoolbox'
+            print("⚡ Hardware acceleration: Apple VideoToolbox detected")
+        elif 'h264_nvenc' in encoders:
+            _hw_encoder_cache = 'h264_nvenc'
+            print("⚡ Hardware acceleration: NVIDIA NVENC detected")
+        elif 'h264_qsv' in encoders:
+            _hw_encoder_cache = 'h264_qsv'
+            print("⚡ Hardware acceleration: Intel QuickSync detected")
+        else:
+            _hw_encoder_cache = 'libx264'
+            print("ℹ️ Using CPU encoding (libx264)")
+            
+    except Exception:
+        _hw_encoder_cache = 'libx264'
+        print("ℹ️ Using CPU encoding (libx264)")
+    
+    return _hw_encoder_cache
+
+def check_disk_space(required_mb, path='.'):
+    """Check if enough disk space is available."""
+    try:
+        usage = shutil.disk_usage(path)
+        free_mb = usage.free / (1024 * 1024)
+        return free_mb >= required_mb * 1.5  # 1.5x safety margin
+    except:
+        return True  # Assume OK if can't check
 
 def get_video_info(input_path):
     """Get full video information."""
@@ -264,6 +320,9 @@ async def process_video_for_bot_safe(input_path, output_path, title, add_intro=F
         if intro_created:
             print("   🎞️ Intro created - re-encoding required...")
             
+            # ✅ Auto-detect hardware encoder
+            encoder = detect_hw_encoder()
+            
             # ✅ filter_complex برای concat intro + main video
             process_cmd = [
                 "ffmpeg", "-y",
@@ -278,14 +337,22 @@ async def process_video_for_bot_safe(input_path, output_path, title, add_intro=F
                 f"[1:a:0]aresample=44100,aformat=sample_fmts=fltp:channel_layouts=stereo[a1];"
                 f"[v0][a0][v1][a1]concat=n=2:v=1:a=1[outv][outa]",
                 "-map", "[outv]", "-map", "[outa]",
-                "-c:v", "libx264",
+                "-c:v", encoder,  # ✅ Auto hardware acceleration
                 "-c:a", "aac",
-                "-preset", "fast",
-                "-crf", "23",
+            ]
+            # Add encoder-specific options
+            if encoder == 'libx264':
+                process_cmd.extend(["-preset", "fast", "-crf", "23"])
+            elif encoder == 'h264_videotoolbox':
+                process_cmd.extend(["-q:v", "65"])  # Quality for VideoToolbox
+            else:
+                process_cmd.extend(["-preset", "fast"])
+            
+            process_cmd.extend([
                 "-pix_fmt", "yuv420p",
                 "-movflags", "+faststart",
                 output_path
-            ]
+            ])
         else:
             # ✅ WITHOUT intro: use STREAM COPY (super fast!)
             print(f"   ⚡ No intro - using fast stream copy...")
@@ -378,6 +445,10 @@ async def process_video_for_user_safe(input_path, output_path, title, add_intro=
         if intro_created:
             # ✅ With intro: re-encode needed for concat
             print(f"   🎞️ Intro created - re-encoding required...")
+            
+            # ✅ Auto-detect hardware encoder
+            encoder = detect_hw_encoder()
+            
             process_cmd = [
                 "ffmpeg", "-y",
                 "-i", intro_path,
@@ -391,14 +462,22 @@ async def process_video_for_user_safe(input_path, output_path, title, add_intro=
                 f"[1:a:0]aresample=44100,aformat=sample_fmts=fltp:channel_layouts=stereo[a1];"
                 f"[v0][a0][v1][a1]concat=n=2:v=1:a=1[outv][outa]",
                 "-map", "[outv]", "-map", "[outa]",
-                "-c:v", "libx264",
+                "-c:v", encoder,  # ✅ Auto hardware acceleration
                 "-c:a", "aac",
-                "-preset", "fast",
-                "-crf", "23",
+            ]
+            # Add encoder-specific options
+            if encoder == 'libx264':
+                process_cmd.extend(["-preset", "fast", "-crf", "23"])
+            elif encoder == 'h264_videotoolbox':
+                process_cmd.extend(["-q:v", "65"])  # Quality for VideoToolbox
+            else:
+                process_cmd.extend(["-preset", "fast"])
+            
+            process_cmd.extend([
                 "-pix_fmt", "yuv420p",
                 "-movflags", "+faststart",
                 output_path
-            ]
+            ])
         else:
             # ✅ WITHOUT intro: use STREAM COPY (super fast, no re-encoding!)
             print(f"   ⚡ No intro - using fast stream copy...")

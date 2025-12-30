@@ -68,6 +68,8 @@ parser.add_argument("--video-dir", type=str, help="Override video directory")
 parser.add_argument("--res", type=int, choices=[720, 1080], default=720, help="Target resolution (720 or 1080, default: 720)")
 parser.add_argument("--index-offset", type=int, default=0, help="Skip N messages before starting index (default: 0)")
 parser.add_argument("--force-user", action="store_true", help="Force using user account (hybrid_account) for indexing")
+parser.add_argument("--dry-run", action="store_true", help="Show what would be done without actually uploading")
+parser.add_argument("--cleanup", action="store_true", help="Remove processed files after successful upload")
 args = parser.parse_args()
 
 # Storage directory
@@ -189,13 +191,17 @@ def load_extra_content(url):
         return None
 
 def unfragment_text(text):
-    """Join fragmented lines that look like they belong to the same sentence."""
+    """
+    Join fragmented lines that look like they belong to the same sentence.
+    Improved: Better handles cases like 'select\nSettings' -> 'select Settings'
+    """
     if not text: return ""
+    
     # 1. Remove solo dots/markers that often cause false breaks
     text = re.sub(r'(?m)^\s*[\.·•]\s*$', '', text)
     
-    # Pre-clean: Ensure Update markers have space
-    text = re.sub(r'(?i)(?P<h>\d+/\d+ Update!|Update!|IMPORTANT:|NOTE:|WARNING:)', r'\n\n\1', text)
+    # Pre-clean: Ensure Update/Important markers have space before them
+    text = re.sub(r'(?i)(?P<h>\d+/\d+ Update!|Update!|IMPORTANT:|NOTE:|WARNING:|QUICK UPDATE:)', r'\n\n\1', text)
     
     lines = text.split('\n')
     cleaned_lines = []
@@ -215,18 +221,24 @@ def unfragment_text(text):
             last_char = current_buffer.strip()[-1] if current_buffer.strip() else ""
             
             # PATTERN DETECTION: Should we start a NEW block?
-            is_list_item = re.match(r'^(\d+\.|\-|[•·*])(?:\s|$)', stripped)
-            is_solo_marker = re.match(r'^(\d+\.|\-|[•·*])$', stripped)
+            is_list_item = re.match(r'^(\d+\.|[\-•·*])\s+\S', stripped)  # Must have content after marker
             
-            is_new_header = (stripped[0].isupper() and 
-                            (last_char in ".!?:;" or 
-                             len(current_buffer.strip()) < 40 or # Short title before it?
-                             re.match(r'^[A-Z\d\s/]+$', stripped) # All caps header?
-                            ))
+            # Is this line a standalone header? (Usually ALL CAPS or ends with colon)
+            is_header = (re.match(r'^[A-Z][A-Z\s]+:?$', stripped) or  # ALL CAPS
+                        stripped.endswith(':'))
             
-            # Decide if we should join or break
-            # Join if it's a continuation OR if the CURRENT line is just a marker (1. / -)
-            if (not is_list_item or is_solo_marker) and not is_new_header and (last_char not in ".!?:;"):
+            # Is this a short continuation? (Like "Settings" after "select")
+            is_short_continuation = (len(stripped) < 30 and 
+                                    not is_header and 
+                                    not is_list_item and
+                                    last_char not in ".!?")
+            
+            # IMPROVED: Join more aggressively for short lines
+            # Only break if: ends with sentence-ending punctuation OR is a list/header
+            should_join = (is_short_continuation or 
+                          (last_char not in ".!?:;" and not is_list_item and not is_header))
+            
+            if should_join:
                 current_buffer += " " + stripped
             else:
                 cleaned_lines.append(current_buffer)
@@ -235,7 +247,7 @@ def unfragment_text(text):
     if current_buffer:
         cleaned_lines.append(current_buffer)
         
-    # Join with DOUBLE NEWLINES per user request for "breathable" layout
+    # Join with DOUBLE NEWLINES for "breathable" layout
     result = '\n\n'.join(cleaned_lines).strip()
     return result
 
@@ -454,6 +466,15 @@ async def main():
             filename, input_path = physical_videos[idx]
 
             title = get_smart_title(input_path)  # Use smart title (metadata preference)
+            
+            # 🔄 DRY-RUN MODE: Just show what would be done
+            if args.dry_run:
+                file_size_mb = os.path.getsize(input_path) / (1024 * 1024)
+                print(f"\n[DRY-RUN] {idx} - {title}")
+                print(f"   📁 Source: {filename}")
+                print(f"   📏 Size: {file_size_mb:.2f}MB")
+                print(f"   {'🎞️ Would add intro' if args.intro else '⚡ No intro (stream copy)'}")
+                continue
             
             # Load Rich Metadata
             meta = load_video_metadata(filename)
