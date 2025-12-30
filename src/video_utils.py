@@ -354,15 +354,35 @@ async def process_video_for_bot_safe(input_path, output_path, title, add_intro=F
                 output_path
             ])
         else:
-            # ✅ WITHOUT intro: use STREAM COPY (super fast!)
-            print(f"   ⚡ No intro - using fast stream copy...")
+            # ✅ No intro: ALWAYS re-encode to target resolution
+            orig_info = get_video_info(input_path)
+            orig_w = orig_info.get('width', 1920) if orig_info else 1920
+            orig_h = orig_info.get('height', 1080) if orig_info else 1080
+            
+            print(f"   🔄 Re-encoding {orig_w}x{orig_h} → {target_w}x{target_h}...")
+            encoder = detect_hw_encoder()
+            
             process_cmd = [
                 "ffmpeg", "-y",
                 "-i", input_path,
-                "-c", "copy",  # ✅ FAST: Just copy, no re-encode!
+                "-vf", f"fps=25,scale={target_w}:{target_h}:force_original_aspect_ratio=decrease,pad={target_w}:{target_h}:(ow-iw)/2:(oh-ih)/2,setsar=1",
+                "-c:v", encoder,
+                "-c:a", "aac",
+                "-ar", "44100",
+                "-ac", "2",
+            ]
+            if encoder == 'libx264':
+                process_cmd.extend(["-preset", "fast", "-crf", "23"])
+            elif encoder == 'h264_videotoolbox':
+                process_cmd.extend(["-q:v", "65"])
+            else:
+                process_cmd.extend(["-preset", "fast"])
+            
+            process_cmd.extend([
+                "-pix_fmt", "yuv420p",
                 "-movflags", "+faststart",
                 output_path
-            ]
+            ])
         
         # ✅ Show ffmpeg progress in terminal
         result = subprocess.run(
@@ -479,15 +499,32 @@ async def process_video_for_user_safe(input_path, output_path, title, add_intro=
                 output_path
             ])
         else:
-            # ✅ WITHOUT intro: use STREAM COPY (super fast, no re-encoding!)
-            print(f"   ⚡ No intro - using fast stream copy...")
+            # ✅ No intro: ALWAYS re-encode to target resolution
+            print(f"   🔄 Re-encoding {orig_w}x{orig_h} → {target_w}x{target_h}...")
+            encoder = detect_hw_encoder()
+            
             process_cmd = [
                 "ffmpeg", "-y",
                 "-i", input_path,
-                "-c", "copy",  # ✅ FAST: Just copy, no re-encode!
+                "-vf", f"fps=25,scale={target_w}:{target_h}:force_original_aspect_ratio=decrease,pad={target_w}:{target_h}:(ow-iw)/2:(oh-ih)/2,setsar=1",
+                "-c:v", encoder,
+                "-c:a", "aac",
+                "-ar", "44100",
+                "-ac", "2",
+            ]
+            # Encoder-specific options
+            if encoder == 'libx264':
+                process_cmd.extend(["-preset", "fast", "-crf", "23"])
+            elif encoder == 'h264_videotoolbox':
+                process_cmd.extend(["-q:v", "65"])
+            else:
+                process_cmd.extend(["-preset", "fast"])
+            
+            process_cmd.extend([
+                "-pix_fmt", "yuv420p",
                 "-movflags", "+faststart",
                 output_path
-            ]
+            ])
         
         # ✅ Show ffmpeg progress in terminal (stdout=None, stderr=None)
         result = subprocess.run(
