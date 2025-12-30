@@ -339,12 +339,42 @@ def format_description_markdown(text):
     Format description text for beautiful Telegram display.
     - Makes headers BOLD
     - Adds proper line spacing
+    - Detects headers embedded in paragraphs
     - Preserves links
     """
     if not text:
         return text
     
-    lines = text.split('\n')
+    # Known header patterns (Title Case short phrases followed by content)
+    # These patterns help split paragraphs where headers are embedded
+    header_patterns = [
+        r'\b(Your Robot Buddy)\s+',
+        r'\b(Superman)\s+',
+        r'\b(Swimming with sharks)\s+',
+        r'\b(Game of thrones)\s+',
+        r'\b(Game of Thrones)\s+',
+        r'\b(Wizard)\s+(?=an image)',
+        r'\b(Pirate)\s+(?=\[insert)',
+        r'\b(IMPORTANT)\s*:?\s*',
+        r'\b(NOTE)\s*:?\s*',
+        r'\b(TIP)\s*:?\s*',
+        r'\b(WARNING)\s*:?\s*',
+    ]
+    
+    # First pass: Split embedded headers into separate lines
+    processed = text
+    for pattern in header_patterns:
+        processed = re.sub(pattern, r'\n\n\1\n', processed)
+    
+    # Also detect generic Title Case headers (2-4 words, followed by longer text)
+    # Pattern: "Title Words" followed by lowercase content
+    processed = re.sub(
+        r'(?<=[.!?\n])\s*([A-Z][a-z]+(?:\s+[A-Z][a-z]+){0,3})\s+(?=[a-z])',
+        r'\n\n\1\n',
+        processed
+    )
+    
+    lines = processed.split('\n')
     formatted_lines = []
     
     for i, line in enumerate(lines):
@@ -359,35 +389,28 @@ def format_description_markdown(text):
             continue
         
         # Detect headers:
-        # 1. Short line (< 50 chars) followed by longer content
-        # 2. Line ending with colon
-        # 3. ALL CAPS line
-        # 4. Title Case line (< 40 chars) that's not a sentence
         is_header = False
         
-        # Check if it's a title-like line
-        if len(stripped) < 50:
-            # Ends with colon
-            if stripped.endswith(':'):
-                is_header = True
-            # ALL CAPS
-            elif stripped.isupper() and len(stripped) > 3:
-                is_header = True
-            # Title Case (most words capitalized) and short
-            elif len(stripped) < 40:
-                words = stripped.split()
-                capitalized = sum(1 for w in words if w[0].isupper() if w)
-                if len(words) >= 2 and capitalized >= len(words) * 0.6:
-                    # Check next line exists and is longer (content follows)
-                    if i + 1 < len(lines):
-                        next_line = lines[i + 1].strip()
-                        if len(next_line) > len(stripped):
-                            is_header = True
+        # Short line (< 35 chars) that looks like a title
+        if len(stripped) < 35 and not stripped.endswith('.'):
+            words = stripped.split()
+            if len(words) >= 1 and len(words) <= 5:
+                # Check if Title Case
+                capitalized = sum(1 for w in words if w and w[0].isupper())
+                if capitalized >= len(words) * 0.5:
+                    is_header = True
+        
+        # Ends with colon
+        if stripped.endswith(':') and len(stripped) < 50:
+            is_header = True
+        
+        # ALL CAPS
+        if stripped.isupper() and len(stripped) > 3 and len(stripped) < 40:
+            is_header = True
         
         if is_header:
-            # Make header bold and add line break before if not first
             if formatted_lines and formatted_lines[-1]:
-                formatted_lines.append('')  # Add spacing before header
+                formatted_lines.append('')
             formatted_lines.append(f"**{stripped}**")
         else:
             formatted_lines.append(stripped)
