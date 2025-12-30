@@ -56,6 +56,7 @@ Options:
   --index-offset N  Skip N messages before index
   --dry-run         Preview without uploading
   --cleanup         Remove processed files after upload
+  --log FILE        Save logs to file (e.g., --log upload.log)
 ```
 
 ---
