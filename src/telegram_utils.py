@@ -10,6 +10,8 @@ BOT_MAX_SIZE_MB = 45
 
 async def upload_with_bot(video_path, caption, token, channel_id, thumb=None, max_retries=3):
     """Upload video using Telegram Bot API."""
+    from .video_utils import get_video_info  # Get video dimensions
+    
     bot = Bot(token=token)
     
     for attempt in range(max_retries):
@@ -20,7 +22,10 @@ async def upload_with_bot(video_path, caption, token, channel_id, thumb=None, ma
                 print(f"   ❌ File larger than {BOT_MAX_SIZE_MB}MB")
                 return None
             
-            print(f"   📤 Uploading with bot: {caption} ({file_size/(1024*1024):.1f}MB)")
+            print(f"   📤 Uploading with bot: {caption[:50]}... ({file_size/(1024*1024):.1f}MB)")
+            
+            # ✅ Get video dimensions for correct aspect ratio display
+            video_info = get_video_info(video_path)
             
             with open(video_path, "rb") as video_file:
                 message = await bot.send_video(
@@ -28,7 +33,10 @@ async def upload_with_bot(video_path, caption, token, channel_id, thumb=None, ma
                     video=video_file,
                     caption=caption[:1024],
                     parse_mode='Markdown',
-                    thumb=open(thumb, 'rb') if thumb and os.path.exists(thumb) else None,
+                    thumbnail=open(thumb, 'rb') if thumb and os.path.exists(thumb) else None,
+                    width=video_info['width'] if video_info else None,      # ✅ FIX: Add width
+                    height=video_info['height'] if video_info else None,    # ✅ FIX: Add height
+                    duration=int(video_info['duration']) if video_info else None,  # ✅ Add duration too
                     supports_streaming=True,
                     read_timeout=180,
                     write_timeout=180
@@ -38,7 +46,7 @@ async def upload_with_bot(video_path, caption, token, channel_id, thumb=None, ma
             return message
             
         except TelegramError as e:
-            print(f"   ❌ Bot upload error (effort {attempt + 1}): {str(e)}")
+            print(f"   ❌ Bot upload error (attempt {attempt + 1}): {str(e)}")
             if attempt < max_retries - 1:
                 await asyncio.sleep(15 * (attempt + 1))
         except Exception as e:

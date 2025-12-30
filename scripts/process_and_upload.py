@@ -1,18 +1,24 @@
 import os
 import subprocess
 import sys
-from telegram import Bot
-
-# Add project root to sys.path so we can import 'src'
-sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-
-from telegram.error import TelegramError
-from pyrogram import Client
 import asyncio
 import json
 import re
-from dotenv import load_dotenv
 import math
+import argparse
+import getpass
+from pathlib import Path
+from datetime import datetime
+from dotenv import load_dotenv
+
+from telegram import Bot
+from telegram.error import TelegramError
+from pyrogram import Client
+from pyrogram.types import Message
+from pyrogram.errors import PasswordHashInvalid, SessionPasswordNeeded, PhoneCodeInvalid
+
+# Add project root to sys.path
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 # Import Shared Modules
 from src.video_utils import (
@@ -21,6 +27,7 @@ from src.video_utils import (
     split_video_for_user_safe as split_video_for_user,
     get_smart_title,
     extract_thumbnail,
+    is_video_valid,
     SIZE_THRESHOLD_MB,
     BOT_MAX_SIZE_MB,
     USER_MAX_SIZE_MB
@@ -33,7 +40,7 @@ from src.telegram_utils import (
 from src.media_resolver import list_all_videos, find_video_file
 from src.manifest_tracker import update_manifest_status, get_pending_videos, get_all_manifest_videos
 
-# Load environment variables from root
+# Load environment variables
 root_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 load_dotenv(os.path.join(root_dir, ".env"))
 
@@ -48,23 +55,19 @@ api_hash = os.getenv("API_HASH")
 channel_username = os.getenv("CHANNEL_USERNAME") or os.getenv("CHANNEL_ID")
 
 # Ensure channel_username is int if it looks like an ID
-if channel_username and (channel_username.startswith('-') or channel_username.isdigit()):
+if channel_username and (isinstance(channel_username, str) and (channel_username.startswith('-') or channel_username.isdigit())):
     try:
         channel_username = int(channel_username)
     except ValueError:
         pass
-
-import asyncio
-import sys
-import subprocess
-from pyrogram import Client
-from pyrogram.types import Message
 
 # Argument Config
 parser = argparse.ArgumentParser(description="Upload videos to Telegram")
 parser.add_argument("--intro", action="store_true", help="Add intro to videos (default: False)")
 parser.add_argument("--video-dir", type=str, help="Override video directory")
 parser.add_argument("--res", type=int, choices=[720, 1080], default=720, help="Target resolution (720 or 1080, default: 720)")
+parser.add_argument("--index-offset", type=int, default=0, help="Skip N messages before starting index (default: 0)")
+parser.add_argument("--force-user", action="store_true", help="Force using user account (hybrid_account) for indexing")
 args = parser.parse_args()
 
 # Storage directory
@@ -212,7 +215,9 @@ def unfragment_text(text):
             last_char = current_buffer.strip()[-1] if current_buffer.strip() else ""
             
             # PATTERN DETECTION: Should we start a NEW block?
-            is_list_item = re.match(r'^(\d+\.|\-|[•·*])\s', stripped)
+            is_list_item = re.match(r'^(\d+\.|\-|[•·*])(?:\s|$)', stripped)
+            is_solo_marker = re.match(r'^(\d+\.|\-|[•·*])$', stripped)
+            
             is_new_header = (stripped[0].isupper() and 
                             (last_char in ".!?:;" or 
                              len(current_buffer.strip()) < 40 or # Short title before it?
@@ -220,8 +225,8 @@ def unfragment_text(text):
                             ))
             
             # Decide if we should join or break
-            # Join ONLY ONLY if it's very likely a sentence continuation
-            if not is_list_item and not is_new_header and (last_char not in ".!?:;"):
+            # Join if it's a continuation OR if the CURRENT line is just a marker (1. / -)
+            if (not is_list_item or is_solo_marker) and not is_new_header and (last_char not in ".!?:;"):
                 current_buffer += " " + stripped
             else:
                 cleaned_lines.append(current_buffer)
@@ -322,8 +327,24 @@ async def main():
             print("   If prompted for a phone number, please enter it.")
             print("   If you enter a Bot Token, the program will NOT work.\n")
             
-            await app.start()
-            
+            try:
+                await app.start()
+            except SessionPasswordNeeded:
+                print("🔐 Two-Step Verification is enabled.")
+                for _ in range(3):
+                    pw = getpass.getpass("🔑 Enter your 2FA Password: ")
+                    try:
+                        await app.check_password(pw)
+                        break
+                    except AuthPasswordInvalid:
+                        print("❌ Incorrect password. Please try again.")
+                else:
+                    print("❌ Too many failed attempts.")
+                    return
+            except Exception as e:
+                print(f"❌ Login failed: {e}")
+                return
+                
             # Verify we are NOT a bot
             if app.me.is_bot:
                 raise ValueError("❌ You entered a Bot Token instead of a Phone Number! Please delete the session and login with your phone.")
@@ -392,18 +413,24 @@ async def main():
         if is_first_upload:
             # Check history to see if we've EVER uploaded anything to this channel via this script
             if not history_data:
-                print(f"\n🆕 First run detected! Sending 10 placeholders for Indexing...")
-                for p in range(1, 11):
+                res_count = 15
+                print(f"\n🆕 First run detected! Reserving {res_count} messages for Index (Table of Contents)...")
+                for p in range(1, res_count + 1):
                     try:
-                        placeholder_text = f"📍 **Index Reserved #{p}**\n(Will be updated automatically)"
+                        placeholder_text = (
+                            f"📍 **Index Reserved #{p}**\n"
+                            f"This message will be automatically updated with the video list.\n"
+                            f"Please do not delete it to maintain the Table of Contents sequence."
+                        )
                         if bot_available:
                             await bot.send_message(chat_id=channel_id, text=placeholder_text)
                         else:
                             await app.send_message(chat_id=channel_username, text=placeholder_text)
-                        print(f"   ✅ Placeholder {p}/10 sent.")
+                        print(f"   ✅ Reserved {p}/{res_count}...")
+                        await asyncio.sleep(0.5)
                     except Exception as e:
-                        print(f"   ⚠️ Failed to send placeholder {p}: {e}")
-                print("🏁 Placeholders ready.\n")
+                        print(f"   ⚠️ Failed to reserve placeholder {p}: {e}")
+                print("🏁 Index reservation complete.\n")
 
         # 3. Iterate through manifest sequence
         for i, m_video in enumerate(manifest_videos, 1):
@@ -448,12 +475,45 @@ async def main():
                 # Add Extra Content (Description + Links)
                 extra = load_extra_content(meta['url'])
                 if extra:
-                    # 🔗 LINKS
+                    desc = extra.get('description', '')
+                    
+                    # --- ROBUST COMMENT STRIPPING (Telegram Output Only) ---
+                    desc = re.split(r'(?i)Comments\s*\n\s*\d+', desc)[0]
+                    desc = re.split(r'(?i)Post Comment', desc)[0]
+                    desc = re.split(r'(?i)\n\d+\s+Comments', desc)[0]
+                    desc = re.split(r'(?m)^\d+ (minutes|hours|days|weeks|months) ago', desc)[0]
+                    desc = re.split(r'(?m)^REPLY\s*\n', desc)[0]
+                    desc = desc.strip()
+                    
+                    # Process Links: Inline first
+                    remaining_links = []
                     if extra.get('links'):
-                        caption += "🔗 **Links:**\n"
                         for link in extra['links']:
+                            url = link['url']
+                            orig_text = link['text']
+                            
+                            # Clean anchor text for matching
+                            match_text = re.sub(r'(?i):\s*CLICK\s*HERE', '', orig_text)
+                            match_text = re.sub(r'(?i)CLICK\s*HERE', '', match_text).strip(": ")
+                            
+                            if not match_text: match_text = "Link"
+                            
+                            # Pattern to find the anchor text followed by optional colon or space
+                            # We search for it in the description to replace it
+                            if match_text.lower() in desc.lower():
+                                # Case-insensitive replacement while keeping original casing if possible
+                                pattern = re.compile(re.escape(match_text), re.IGNORECASE)
+                                if pattern.search(desc):
+                                    desc = pattern.sub(f"[{match_text}]({url})", desc)
+                                    continue # Successfully inlined, don't add to header
+                            
+                            remaining_links.append(link)
+                    
+                    # 🔗 LINKS Header (Only for those not inlined)
+                    if remaining_links:
+                        caption += "🔗 **Links:**\n"
+                        for link in remaining_links:
                             link_text = link['text']
-                            # Clean "CLICK HERE" or ": CLICK HERE"
                             link_text = re.sub(r'(?i):\s*CLICK\s*HERE', '', link_text)
                             link_text = re.sub(r'(?i)CLICK\s*HERE', '', link_text)
                             link_text = link_text.strip(": ")
@@ -461,57 +521,31 @@ async def main():
                             caption += f"• [{link_text}]({link['url']})\n"
                         caption += "\n"
                     
-                    # 📝 INFO (Cleaned Description)
-                    if extra.get('description'):
-                        desc = extra['description']
-                        
-                        # --- ROBUST COMMENT STRIPPING (Telegram Output Only) ---
-                        desc = re.split(r'(?i)Comments\s*\n\s*\d+', desc)[0]
-                        desc = re.split(r'(?i)Post Comment', desc)[0]
-                        desc = re.split(r'(?i)\n\d+\s+Comments', desc)[0]
-                        
-                        # Timestamped replies (e.g. "Amer Tobing\n20 hours ago\n...")
-                        desc = re.split(r'(?m)^\d+ (minutes|hours|days|weeks|months) ago', desc)[0]
-                        desc = re.split(r'(?m)^REPLY\s*\n', desc)[0]
-                        
-                        desc = desc.strip()
-                        
-                        # Remove placeholder dots used for spacing
-                        desc = re.sub(r'(?m)^\.\s*$', '', desc)
-                        # Fix spacing before headers
-                        desc = re.sub(r'(?i)(?P<h>QUICK UPDATE:|IMPORTANT:|NOTE:|WARNING:)', r'\n\n**\1**', desc)
-                        # Format Update Headers
-                        desc = re.sub(r'(^|\n)(\d{1,2}/\d{1,2} Update!.*?)(?=\n|$)', r'\1\n**\2**', desc)
-                        desc = re.sub(r'(^|\n)(Update!.*?)(?=\n|$)', r'\1\n**\2**', desc)
-                        
-                        # 1. Clean labels first to reveal actual punctuation
+                    # 📝 INFO (The updated description with inline links)
+                    if desc:
+                        # Clean labels, spacing
                         desc = re.sub(r'(?i)CLICK\s*HERE\s*:?\s*', '', desc)
-                        
-                        # 2. Unfragment (Joins sentences, respects lists)
                         desc = unfragment_text(desc)
-                        
-                        # Final cleanliness check
                         desc = re.sub(r'\n{3,}', '\n\n', desc).strip()
                         
-                        if desc:
-                            current_len = len(caption) + len("📝 **Info:**\n")
-                            remaining = 1024 - current_len - 20
+                        current_len = len(caption) + len("📝 **Info:**\n")
+                        remaining = 1024 - current_len - 20
 
-                            if len(desc) <= remaining:
-                                caption += f"📝 **Info:**\n{desc}"
+                        if len(desc) <= remaining:
+                            caption += f"📝 **Info:**\n{desc}"
+                        else:
+                            candidate = desc[:remaining]
+                            last_break = max(candidate.rfind('\n\n'), candidate.rfind('\n'), candidate.rfind('. '))
+                            
+                            if last_break > 0:
+                                visible = desc[:last_break+1].strip()
+                                overflow_text = desc[last_break+1:].strip()
+                                caption += f"📝 **Info:**\n{visible}\n\n⬇️ **(See next message)**"
+                                need_overflow = True
                             else:
-                                candidate = desc[:remaining]
-                                last_break = max(candidate.rfind('\n\n'), candidate.rfind('\n'), candidate.rfind('. '))
-                                
-                                if last_break > 0:
-                                    visible = desc[:last_break+1].strip()
-                                    overflow_text = desc[last_break+1:].strip()
-                                    caption += f"📝 **Info:**\n{visible}\n\n⬇️ **(See next message)**"
-                                    need_overflow = True
-                                else:
-                                    caption += f"📝 **Info:**\n{candidate}..."
-                                    overflow_text = desc[remaining:]
-                                    need_overflow = True
+                                caption += f"📝 **Info:**\n{candidate}..."
+                                overflow_text = desc[remaining:]
+                                need_overflow = True
             else:
                 # Fallback for when no metadata is found
                 caption = f"**{title}**"
@@ -536,18 +570,22 @@ async def main():
             
             processing_needed = True
             if os.path.exists(output_path):
-                print(f"✅ Pre-processed file already exists: {output_path}")
-                processing_needed = False
-                processed_files = [output_path]
-                
-                # Still need to decide method for uploading
-                file_size_mb = os.path.getsize(output_path) / (1024 * 1024)
-                upload_method = decide_upload_method(file_size_mb)
-                
-                # Fallback if bot missing
-                if upload_method == 'bot' and not bot_available:
-                     upload_method = 'user'
-            
+                if is_video_valid(output_path):
+                    print(f"✅ Pre-processed file exists and is valid: {output_path}")
+                    processing_needed = False
+                    processed_files = [output_path]
+                else:
+                    print(f"⚠️ Pre-processed file is invalid/corrupted. Re-processing: {output_path}")
+                    try: os.remove(output_path)
+                    except: pass
+                # Decide upload method for existing file
+                if not processing_needed:
+                    file_size_mb = os.path.getsize(output_path) / (1024 * 1024)
+                    upload_method = decide_upload_method(file_size_mb)
+                    if upload_method == 'bot' and not bot_available:
+                        upload_method = 'user'
+                    print(f"🎯 Selected method (Existing): {'Bot' if upload_method == 'bot' else 'User Account'}")
+
             if processing_needed:
                 print(f"🔄 Processing and Compressing to 720p...")
                 
@@ -564,37 +602,19 @@ async def main():
                     # Decide if we need to split based on COMPRESSED size
                     if compressed_size_mb > USER_MAX_SIZE_MB:
                         print(f"⚠️ Still larger than {USER_MAX_SIZE_MB}MB after compression. Splitting...")
-                        # Split the ALREADY PROCESSED file
-                        # We pass 'add_intro=False' because we already added intro in Step 1 (if any)
-                        # We pass output_path as input to split
                         processed_files = await split_video_for_user(output_path, output_dir, title, target_size_mb=USER_MAX_SIZE_MB, add_intro=False, target_res=args.res)
-                        
-                        # We can remove the big processed file since we have parts now
-                        try:
-                            # os.remove(output_path) # Optional: remove 720p single file to save space? 
-                            # But wait, logic later cleans up 'processed_files'. 
-                            pass
-                        except: pass
                     else:
                         # Fits in one part
                         processed_files = [output_path]
-                        
-                        # Check if small enough for bot? (Optional)
-                        # If < 50MB, user might want bot? But user said "speed up upload", user account is fine.
-                        # Let's stick to User Account for consistency unless requested.
+                        upload_method = decide_upload_method(compressed_size_mb)
+                        if upload_method == 'bot' and not bot_available:
+                            upload_method = 'user'
+                    
+                    print(f"🎯 Selected method (New): {'Bot' if upload_method == 'bot' else 'User Account'}")
                 else:
                     print("❌ Processing failed.")
                     failed_count += 1
                     continue
-            else:
-                 # Already processed case (lines ~127 in previous view)
-                 # We need to re-evaluate upload method for the processed file
-                 file_size_mb = os.path.getsize(output_path) / (1024 * 1024)
-                 upload_method = decide_upload_method(file_size_mb)
-                 if upload_method == 'bot' and not bot_available:
-                    print(f"ℹ️ File is small ({file_size_mb:.2f}MB) but bot is not enabled. Switching to User Account.")
-                    upload_method = 'user'
-                 print(f"🎯 Selected method: {'Bot' if upload_method == 'bot' else 'User Account'}")
             
             if not processed_files:
                 print(f"❌ Error in file processing")
@@ -606,10 +626,15 @@ async def main():
             has_thumb = False
             
             if processed_files:
-                # Try 5 seconds in, then 10 if that might be better? 5 is usually safe.
-                # Extract thumb from the FIRST processed part
-                print(f"🖼️ Extracting representative thumbnail from {os.path.basename(processed_files[0])}...")
-                has_thumb = extract_thumbnail(processed_files[0], thumb_path, timestamp="00:00:05")
+                # Try multiple timestamps
+                print(f"🖼️ Extracting thumbnail from {os.path.basename(processed_files[0])}...")
+                has_thumb = extract_thumbnail(processed_files[0], thumb_path)
+                
+                if not has_thumb:
+                    print(f"❌ CRITICAL Error: Mandatory thumbnail extraction failed for {idx}.")
+                    print(f"   Skipping this video to maintain professional quality.")
+                    failed_count += 1
+                    continue
 
             if upload_method == "user":
                  # User usually has 1 file
@@ -690,13 +715,34 @@ async def main():
         print(f"   📈 Success Rate: {(processed_count/total_files)*100:.1f}%")
         print(f"{'='*60}")
         
+        # Trigger Indexing
+        print("\n🧾 Triggering automatic Index Post update...")
+        try:
+            cmd = [sys.executable, "scripts/update_captions.py", "--run-now", "--only-index"]
+            if args.index_offset > 0:
+                cmd.extend(["--index-offset", str(args.index_offset)])
+            if args.force_user:
+                cmd.append("--force-user")
+            subprocess.run(cmd)
+            print("✅ Indexing process finished.")
+        except Exception as e:
+            print(f"⚠️ Failed to trigger indexing: {e}")
+        
     except KeyboardInterrupt:
         print("\n⚠️ Stopped by Ctrl+C")
     except Exception as e:
-        print(f"❌ Unexpected Error: {str(e)}")
+        if "database disk image is malformed" in str(e).lower():
+            print(f"\n❌ CRITICAL ERROR: Telegram session database is corrupted.")
+            print(f"👉 Fix: Run 'rm scripts/hybrid_account.session' and try again.")
+        else:
+            print(f"❌ Unexpected Error: {str(e)}")
     finally:
-        await app.stop()
-        print("🔒 Connection closed")
+        try:
+            if 'app' in locals() and app.is_connected:
+                await app.stop()
+                print("🔒 Connection closed")
+        except:
+            pass
 
 if __name__ == "__main__":
     asyncio.run(main())

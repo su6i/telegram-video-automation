@@ -1,6 +1,6 @@
 # Telegram Video Automation Kit
 
-[![LinkedIn](https://img.shields.io/badge/Connect-LinkedIn-blue?style=flat-square&logo=linkedin)](https://www.linkedin.com/in/yourname/)
+[![LinkedIn](https://img.shields.io/badge/Connect-LinkedIn-blue?style=flat-square&logo=linkedin)](https://www.linkedin.com/in/su6i/)
 
 **Navigation:** [README](README.md) | [Quick Start](QUICK_START.md) | [Scan & Resume](SCAN_RESUME.md)
 
@@ -8,10 +8,15 @@
 
 ## ⚡ Quick Start
 ```bash
-./scan.sh      # 🔍 Map structure
-./download.sh  # 📥 Fetch media
-./upload.sh    # 🚀 Optimize & Post
+./scan.sh           # 🔍 Map structure
+./download.sh       # 📥 Fetch media
+./upload.sh         # 🚀 Optimize, Post & Auto-Index
 ```
+
+> [!TIP]
+> **Customizing the Index (Table of Contents)**
+> If you have pre-created "Welcome" or "Placeholder" messages in your channel, you can tell the uploader to use them for the Table of Contents:
+> `./upload.sh --index-offset 123` (Where `123` is the Message ID of your first placeholder).
 
 ---
 
@@ -31,29 +36,95 @@ The system is designed to be a fully automated bridge between web content and Te
 ### 🧩 Core Components
 1. **🔍 Scan**: Initializes the mapping of content hierarchy and metadata via `scraper.py`.
 2. **📥 Download**: Asynchronously fetches media assets into the local environment.
-3. **🚀 Upload**: A heavy-duty pipeline that handles FFmpeg re-encoding, resolution scaling, and sequential delivery to Telegram channels.
+3. **🚀 Upload**: A high-performance pipeline featuring:
+   - ⚡ **Fast Stream Copy**: No re-encoding when possible (processes 3GB files in ~2 minutes)
+   - 🎬 **Smart Intro Generation**: Optional title cards with automatic re-encoding
+   - 📐 **Correct Aspect Ratio**: Proper width/height metadata for both Bot and User uploads
+   - 🔗 **Intelligent Link Placement**: Links are embedded inline within descriptions
+
+---
 
 ---
 
 ## 🎬 Live Demo (Simulated Output)
-```text
-$ ./upload.sh --res 720 --intro
-🚀 Starting high-performance upload pipeline...
-📊 Profile: 720p HD | Intro: Enabled | Auto-Index: Active
+```ansi
+[1;34m$ ./upload.sh --res 720 --intro --index-offset 2[0m
+🚀 [1;32mStarting high-performance upload pipeline...[0m
+📊 Profile: 720p HD | Intro: Enabled | Index Offset: 2
 
 [1/45] 🎞️ Processing: "001 - Introduction.mp4"
-   ├─ ⚙️ Re-encoding to 720p... [OK]
-   ├─ 🎨 Generating title card... [OK]
-   └─ 📤 Uploading to Telegram (@YourChannel)... [100%]
-✅ Success: Message ID #1052
+   ├─ ⚙️ Re-encoding to 720p... [1;32m[OK][0m
+   ├─ 🎨 Generating title card... [1;32m[OK][0m
+   └─ 📤 Uploading to Telegram (@YourChannel)... [1;32m[100%][0m
+✅ [1;32mSuccess: Message ID #1052[0m
 
 [2/45] 🎞️ Processing: "002 - Advanced Logic.mp4"
-   └─ 📤 Direct upload (already optimized)... [100%]
-✅ Success: Message ID #1053
+   └─ 📤 Direct upload (already optimized)... [1;32m[100%][0m
+✅ [1;32mSuccess: Message ID #1053[0m
 
-✨ Upload sequence finished.
-📝 Successfully updated Table of Contents placeholders.
+✨ [1;35mUpload sequence finished.[0m
+📝 [1;36mUpdating Table of Contents at Message #2... [1;32m[DONE][0m
 ```
+
+---
+
+## � Channel Planning & Strategy
+
+### 📊 Index Calculation (for Table of Contents)
+Telegram has a **4,096 character limit** per message. A clean index entry usually looks like this:
+`023. Advance Logic & Loops [Watch Now](t.me/c/123/456)` (~80 characters).
+
+*   **Capacity:** One message can hold ~50 videos.
+*   **For 500 Videos:** You will need at least **10 messages** for the index.
+*   **Recommendation:** If you want your index to stay at the **top** of the channel (just after your Welcome message), we recommend:
+    1.  **Welcome Message:** Post your introductory message (ID 1).
+    2.  **Auto-Reservation:** Just run the uploader. During the first run (Index 001), it will **automatically** reserve 15 professional placeholder messages for the index.
+    3.  **Run Uploader:**
+        ```bash
+        ./upload.sh --index-offset 2
+        ```
+    4.  **Collision Protection:** The system automatically checks if a message contains media (video/photo) before trying to update the index. If it detects media, it stops to protect your content from being overwritten.
+
+---
+
+## 🔄 Managing the Table of Contents (Indexer)
+
+If you want to manually fix the index or re-number videos after deleting/adding files:
+
+1.  **Identify Starting Point:** Find the **Message ID** of your first blank message or placeholder. 
+    *   *Tip: Right-click a message in Telegram → Copy Message Link. The last number (e.g., `4`) is the ID.*
+2.  **Run the Indexer Tool:**
+    ```bash
+    # Re-build the index starting from Message #4
+    python scripts/update_captions.py --index-offset 4 --run-now
+    ```
+
+### Command Break-down:
+- `update_captions.py`: The tool that fixes titles and builds the index.
+- `--index-offset 4`: Tells the tool "Start filling the Table of Contents from Message #4".
+- `--run-now`: Tells the tool "Actually apply these changes to the channel".
+
+---
+
+## �🛠️ Advanced Features & Troubleshooting
+
+### 🔍 How to find a Message ID (for Index Offset)
+If you want to start your Table of Contents from a specific message (e.g., a pre-created placeholder), you need its **Message ID**:
+1. Open Telegram Desktop.
+2. **Right-click** on the message you want to use.
+3. Select **"Copy Post Link"**.
+4. Paste it anywhere. The ID is the **last number** in the link.
+   * *Example:* `https://t.me/c/12345/678` → Message ID is **678**.
+5. Run: `./upload.sh --index-offset 678`
+
+### ❌ Error: "database disk image is malformed"
+If you see this error, it means your Telegram session file has become corrupted.
+**Solution:**
+1. Delete the corrupted session file:
+   ```bash
+   rm scripts/hybrid_account.session
+   ```
+2. Run `./upload.sh` again. It will ask you to log in one more time.
 
 ---
 
@@ -61,9 +132,11 @@ $ ./upload.sh --res 720 --intro
 This project serves as a showcase for robust automation and media engineering:
 
 - **Asynchronous Data Handling**: Optimized concurrency for high-speed scraping and media downloads.
-- **Media Engineering API**: A dedicated wrapper for `FFmpeg` to handle dynamic video manipulation, scaling, and intro generation.
+- **Media Engineering API**: A dedicated wrapper for `FFmpeg` with smart codec selection:
+  - Uses **stream copy** (`-c copy`) for maximum speed when no modifications needed
+  - Falls back to re-encoding only when intro/scaling is required
 - **Stateful Manifest System**: A JSON-backed tracking system to ensure resume-ability and sequential integrity across large batches.
-- **Telegram Bot Protocol**: Advanced implementation of the Telegram API for automated channel management and message indexing.
+- **Telegram Bot Protocol**: Advanced implementation of the Telegram API with proper video metadata (width, height, duration) for correct display.
 - **Modular Design**: Decoupled modules for scraping, media utilities, and delivery logic.
 
 ---
