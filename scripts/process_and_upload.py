@@ -7,6 +7,7 @@ import re
 import math
 import argparse
 import getpass
+import logging
 from pathlib import Path
 from datetime import datetime
 from dotenv import load_dotenv
@@ -70,7 +71,26 @@ parser.add_argument("--index-offset", type=int, default=0, help="Skip N messages
 parser.add_argument("--force-user", action="store_true", help="Force using user account (hybrid_account) for indexing")
 parser.add_argument("--dry-run", action="store_true", help="Show what would be done without actually uploading")
 parser.add_argument("--cleanup", action="store_true", help="Remove processed files after successful upload")
+parser.add_argument("--log", type=str, metavar="FILE", help="Save logs to file (e.g., --log upload.log)")
 args = parser.parse_args()
+
+# Setup Logging
+if args.log:
+    log_path = args.log if os.path.isabs(args.log) else os.path.join(".storage", args.log)
+    logging.basicConfig(
+        level=logging.INFO,
+        format='%(asctime)s | %(levelname)s | %(message)s',
+        datefmt='%Y-%m-%d %H:%M:%S',
+        handlers=[
+            logging.FileHandler(log_path, encoding='utf-8'),
+            logging.StreamHandler(sys.stdout)
+        ]
+    )
+    logger = logging.getLogger(__name__)
+    logger.info(f"📝 Logging to file: {log_path}")
+else:
+    logging.basicConfig(level=logging.WARNING)
+    logger = logging.getLogger(__name__)
 
 # Storage directory
 STORAGE_DIR = ".storage"
