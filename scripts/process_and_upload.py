@@ -220,17 +220,16 @@ def load_extra_content(url):
 
 def unfragment_text(text):
     """
-    Join fragmented lines that look like they belong to the same sentence.
-    Improved: Better handles cases like 'select\nSettings' -> 'select Settings'
+    Join fragmented lines into coherent sentences and paragraphs.
+    Specifically designed to fix vertical/word-by-line fragmentation.
     """
     if not text: return ""
     
-    # 1. Remove solo dots/markers that often cause false breaks
-    text = re.sub(r'(?m)^\s*[\.·•]\s*$', '', text)
+    # 1. First pass: Pre-join extremely short lines (less than 15 chars) 
+    # unless they look like list items or headers.
+    text = re.sub(r'(?m)^([A-Za-z0-9, ]{1,15})\n([A-Za-z0-9])', r'\1 \2', text)
     
-    # Pre-clean: Ensure Update/Important markers have space before them
-    text = re.sub(r'(?i)(?P<h>\d+/\d+ Update!|Update!|IMPORTANT:|NOTE:|WARNING:|QUICK UPDATE:)', r'\n\n\1', text)
-    
+    # 2. Re-split after pre-cleaning
     lines = text.split('\n')
     cleaned_lines = []
     current_buffer = ""
@@ -246,28 +245,37 @@ def unfragment_text(text):
         if not current_buffer:
             current_buffer = stripped
         else:
-            last_char = current_buffer.strip()[-1] if current_buffer.strip() else ""
+            # Decide if 'stripped' should join 'current_buffer'
+            last_char = current_buffer[-1] if current_buffer else ""
             
-            # PATTERN DETECTION: Should we start a NEW block?
-            is_list_item = re.match(r'^(\d+\.|[\-•·*])\s+\S', stripped)  # Must have content after marker
+            is_list_item = re.match(r'^(\d+\.|[\-•·*])\s+\S', stripped)
+            is_header = stripped.isupper() and len(stripped) < 40 or stripped.endswith(':')
             
-            # Is this line a standalone header? (Usually ALL CAPS or ends with colon)
-            is_header = (re.match(r'^[A-Z][A-Z\s]+:?$', stripped) or  # ALL CAPS
-                        stripped.endswith(':'))
+            # AGGRESSIVE JOIN CONDITIONS:
+            # - Buffer doesn't end with a period/question/exclamation
+            # - Stripped starts with a lowercase letter
+            # - Stripped is very short and buffer isn't finished
+            # - Stripped is a single symbol like '!'
+            starts_lower = stripped[0].islower() if stripped and stripped[0].isalpha() else False
+            is_punctuation_solo = stripped in ".!?,;:"
             
-            # Is this a short continuation? (Like "Settings" after "select")
-            is_short_continuation = (len(stripped) < 30 and 
-                                    not is_header and 
-                                    not is_list_item and
-                                    last_char not in ".!?")
-            
-            # IMPROVED: Join more aggressively for short lines
-            # Only break if: ends with sentence-ending punctuation OR is a list/header
-            should_join = (is_short_continuation or 
-                          (last_char not in ".!?:;" and not is_list_item and not is_header))
-            
+            should_join = False
+            if last_char not in ".!?:;" and not is_list_item:
+                should_join = True
+            elif starts_lower:
+                should_join = True
+            elif is_punctuation_solo:
+                should_join = True
+            elif len(stripped.split()) == 1 and not is_header and not is_list_item:
+                # Catch single words like 'EXTREMELY' or 'IMPORTANT'
+                should_join = True
+                
             if should_join:
-                current_buffer += " " + stripped
+                # Add space if not punctuation, else join directly
+                if is_punctuation_solo:
+                    current_buffer += stripped
+                else:
+                    current_buffer += " " + stripped
             else:
                 cleaned_lines.append(current_buffer)
                 current_buffer = stripped
@@ -275,9 +283,9 @@ def unfragment_text(text):
     if current_buffer:
         cleaned_lines.append(current_buffer)
         
-    # Join with DOUBLE NEWLINES for "breathable" layout
-    result = '\n\n'.join(cleaned_lines).strip()
-    return result
+    # Final cleanup: Join with single newline, then use double newlines for semantic breaks later
+    # This prevents the vertical look
+    return '\n'.join(cleaned_lines).strip()
 
 
 def escape_markdown_text(text):
@@ -354,31 +362,31 @@ def format_description_markdown(text):
     if not text:
         return text
     
-    # Known header patterns (Title Case short phrases followed by content)
-    # These patterns help split paragraphs where headers are embedded
+    # Known header/callout patterns
     header_patterns = [
         r'\b(Your Robot Buddy)\s+',
         r'\b(Superman)\s+',
         r'\b(Swimming with sharks)\s+',
-        r'\b(Game of thrones)\s+',
-        r'\b(Game of Thrones)\s+',
+        r'\b(Game of [Tt]hrones)\s+',
         r'\b(Wizard)\s+(?=an image)',
         r'\b(Pirate)\s+(?=\[insert)',
-        r'\b(IMPORTANT)\s*:?\s*',
-        r'\b(NOTE)\s*:?\s*',
-        r'\b(TIP)\s*:?\s*',
-        r'\b(WARNING)\s*:?\s*',
+        r'\b(EXTREMELY IMPORTANT!?)\b',
+        r'\b(IMPORTANT!?)\b',
+        r'\b(NOTE:?)\b',
+        r'\b(TIP:?)\b',
+        r'\b(WARNING!?)\b',
+        r'\b(Lesson Recap:?)\b',
+        r'\b(How to [^:\n]+:?)\b',
     ]
     
-    # First pass: Split embedded headers into separate lines
+    # First pass: Protect and isolate potential headers
     processed = text
     for pattern in header_patterns:
         processed = re.sub(pattern, r'\n\n\1\n', processed)
     
     # Also detect generic Title Case headers (2-4 words, followed by longer text)
-    # Pattern: "Title Words" followed by lowercase content
     processed = re.sub(
-        r'(?<=[.!?\n])\s*([A-Z][a-z]+(?:\s+[A-Z][a-z]+){0,3})\s+(?=[a-z])',
+        r'(?<=[.!?\n])\s*([A-Z][a-z]+(?:\s+[A-Z][a-z]+){0,3})\s+(?=[a-z]{10,})',
         r'\n\n\1\n',
         processed
     )
@@ -393,40 +401,53 @@ def format_description_markdown(text):
             continue
         
         # Skip if already has Markdown formatting
-        if stripped.startswith('**') or stripped.startswith('['):
+        if (stripped.startswith('**') and stripped.endswith('**')) or stripped.startswith('['):
             formatted_lines.append(stripped)
             continue
         
         # Detect headers:
         is_header = False
         
-        # Short line (< 35 chars) that looks like a title
-        if len(stripped) < 35 and not stripped.endswith('.'):
+        # 1. Known callouts (ALL CAPS or special words)
+        if re.search(r'^(EXTREMELY\s+)?(IMPORTANT|NOTE|TIP|WARNING|RECAP|RESOURCES|HOW TO)\b', stripped.upper()):
+            is_header = True
+            
+        # 2. Short line (< 40 chars) that looks like a title
+        elif len(stripped) < 40 and not stripped.endswith('.'):
             words = stripped.split()
-            if len(words) >= 1 and len(words) <= 5:
-                # Check if Title Case
-                capitalized = sum(1 for w in words if w and w[0].isupper())
-                if capitalized >= len(words) * 0.5:
+            if 1 <= len(words) <= 6:
+                # Check Title Case ratio
+                capitalized = sum(1 for w in words if w and (w[0].isupper() or not w[0].isalpha()))
+                if capitalized >= len(words) * 0.7:
                     is_header = True
         
-        # Ends with colon
-        if stripped.endswith(':') and len(stripped) < 50:
+        # 3. Ends with colon
+        elif stripped.endswith(':') and len(stripped) < 60:
             is_header = True
         
-        # ALL CAPS
-        if stripped.isupper() and len(stripped) > 3 and len(stripped) < 40:
+        # 4. ALL CAPS
+        elif stripped.isupper() and 3 < len(stripped) < 45:
             is_header = True
         
         if is_header:
+            # Ensure spacing before header if not at start
             if formatted_lines and formatted_lines[-1]:
                 formatted_lines.append('')
             formatted_lines.append(f"**{stripped}**")
         else:
-            formatted_lines.append(stripped)
+            # For non-headers, ensure list items are readable
+            if re.match(r'^(\d+\.|[\-•·*])\s+\S', stripped):
+                formatted_lines.append(stripped)
+            else:
+                formatted_lines.append(stripped)
     
-    # Join and clean up excessive newlines
+    # Join and clean up excessive newlines (max 2)
     result = '\n'.join(formatted_lines)
     result = re.sub(r'\n{3,}', '\n\n', result)
+    
+    # Final fix for vertical list items (join them if they are too sparse)
+    result = re.sub(r'([•·*])\s*\n\n', r'\1 ', result)
+    
     return result.strip()
 
 def save_upload_history(index, title, message_obj, is_bot):
