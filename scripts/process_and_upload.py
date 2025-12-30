@@ -217,15 +217,10 @@ def load_extra_content(url):
 def unfragment_text(text):
     """
     Join fragmented lines into coherent sentences and paragraphs.
-    Specifically designed to fix vertical/word-by-line fragmentation.
+    Much more conservative to preserve lists and headers.
     """
     if not text: return ""
     
-    # 1. First pass: Pre-join extremely short lines (less than 15 chars) 
-    # unless they look like list items or headers.
-    text = re.sub(r'(?m)^([A-Za-z0-9, ]{1,15})\n([A-Za-z0-9])', r'\1 \2', text)
-    
-    # 2. Re-split after pre-cleaning
     lines = text.split('\n')
     cleaned_lines = []
     current_buffer = ""
@@ -236,46 +231,36 @@ def unfragment_text(text):
             if current_buffer:
                 cleaned_lines.append(current_buffer)
                 current_buffer = ""
+            cleaned_lines.append("") # Preserve intended breaks
             continue
             
         if not current_buffer:
             current_buffer = stripped
         else:
-            # Decide if 'stripped' should join 'current_buffer'
             last_char = current_buffer[-1] if current_buffer else ""
             
+            # Identify list items / headers
             is_list_item = re.match(r'^(\d+\.|[\-•·*])\s+\S', stripped) or re.match(r'^\d+\.?$', stripped)
             
-            # Protected Headers (Should not be merged into paragraphs)
             PROTECTED_HEADERS = {'Your Robot Buddy', 'Superman', 'Swimming with sharks', 'Game of Thrones', 'Wizard', 'Pirate', 'EXTREMELY IMPORTANT', 'IMPORTANT NOTE', 'Lesson Recap', 'Prompt Template', 'Continued'}
             is_protected_header = any(h.upper() in stripped.upper() for h in PROTECTED_HEADERS)
-            
             is_header = is_protected_header or (stripped.isupper() and len(stripped) < 40) or (stripped.endswith(':') and len(stripped) < 60)
             
-            # AGGRESSIVE JOIN CONDITIONS:
             starts_lower = stripped[0].islower() if stripped and stripped[0].isalpha() else False
-            is_punctuation_solo = stripped in ".!?,;:"
             
-            # DON'T JOIN if it's a list item OR a protected header
+            # ONLY join if it's a clear paragraph continuation
             should_join = False
-            
             if is_list_item or is_header:
                 should_join = False
-            elif last_char not in ".!?:;":
+            elif last_char in ",;:": # Clearly continuing (e.g. lists or commas)
                 should_join = True
-            elif starts_lower:
+            elif last_char not in ".!?" and starts_lower: # Middle of a sentence
                 should_join = True
-            elif is_punctuation_solo:
-                should_join = True
-            elif len(stripped.split()) == 1:
+            elif len(current_buffer.split()) < 5 and not last_char in ".!?:;": # Extremely short fragment
                 should_join = True
                 
             if should_join:
-                # Add space if not punctuation, else join directly
-                if is_punctuation_solo:
-                    current_buffer += stripped
-                else:
-                    current_buffer += " " + stripped
+                current_buffer += " " + stripped
             else:
                 cleaned_lines.append(current_buffer)
                 current_buffer = stripped
@@ -283,8 +268,6 @@ def unfragment_text(text):
     if current_buffer:
         cleaned_lines.append(current_buffer)
         
-    # Final cleanup: Join with single newline, then use double newlines for semantic breaks later
-    # This prevents the vertical look
     return '\n'.join(cleaned_lines).strip()
 
 
@@ -355,70 +338,36 @@ def format_description_markdown(text):
     """
     Format description text for beautiful Telegram display.
     - Makes headers BOLD
-    - Adds proper line spacing
-    - Detects headers embedded in paragraphs
-    - Preserves links
+    - Preserves indentation and newlines where logical
     """
     if not text:
         return text
     
-    # words that should NEVER be a standalone header
     EXCLUDED_WORDS = {'Both', 'His', 'Their', 'Once', 'The', 'And', 'With', 'From', 'This', 'That', 'These', 'Those'}
     
-    # Known header/callout patterns - allow matching inside paragraphs but ensure they get split
+    # Improved patterns: handle colons correctly
     header_patterns = [
-        r'\b(Your Robot Buddy)\s+',
-        r'\b(Superman)\s+',
-        r'\b(Swimming with sharks)\s+',
-        r'\b(Game of [Tt]hrones)\s+',
-        r'\b(Wizard)\s+(?=an image)',
-        r'\b(Pirate)\s+(?=\[insert)',
-        r'\b(EXTREMELY IMPORTANT!?)\b',
-        r'\b(IMPORTANT NOTE:?|IMPORTANT!?)\b',
-        r'\b(NOTE:?)\b',
-        r'\b(TIP:?)\b',
-        r'\b(WARNING!?)\b',
-        r'\b(Lesson Recap:?)\b',
-        r'\b(How to [^:\n]+:?)\b',
+        r'\b(Your Robot Buddy)\s*',
+        r'\b(Superman)\s*',
+        r'\b(Swimming with sharks)\s*',
+        r'\b(Game of [Tt]hrones)\b',
+        r'\b(Wizard)\s*(?=an image)',
+        r'\b(Pirate)\s*(?=\[insert)',
+        r'\b(EXTREMELY IMPORTANT[:!]?)\s*',
+        r'\b(IMPORTANT NOTE:?|IMPORTANT[:!]?)\s*',
+        r'\b(NOTE:?)\s*',
+        r'\b(TIP:?)\s*',
+        r'\b(WARNING[:!]?)\s*',
+        r'\b(Lesson Recap:?)\s*',
+        r'\b(Prompt Templates?:?)\s*',
+        r'\b(\d+/\d+\s+Update[:!]?)\s*',
+        r'\b(How to [^:\n]+:?)\s*',
     ]
     
-    # First pass: Protect and isolate potential headers
     processed = text
     for pattern in header_patterns:
-        # Use placeholders to protect headers from vertical merging
+        # Protect headers by wrapping them - ensure they stay on their own line
         processed = re.sub(pattern, r'\n\n@@@\1@@@\n', processed)
-    
-    # 1.5 Join vertical text ONLY if they aren't protected headers
-    lines = processed.split('\n')
-    joined_lines = []
-    temp_buf = []
-    
-    for line in lines:
-        s = line.strip()
-        if not s:
-            if temp_buf: joined_lines.append(" ".join(temp_buf)); temp_buf = []
-            joined_lines.append("")
-        elif s.startswith("@@@") and s.endswith("@@@"):
-            if temp_buf: joined_lines.append(" ".join(temp_buf)); temp_buf = []
-            joined_lines.append(s)
-        else:
-            temp_buf.append(s)
-    if temp_buf: joined_lines.append(" ".join(temp_buf))
-    processed = "\n".join(joined_lines)
-
-    # Also detect generic Title Case headers
-    def generic_header_fix(match):
-        header_text = match.group(1).strip()
-        first_word = header_text.split()[0]
-        if first_word in EXCLUDED_WORDS and len(header_text.split()) == 1:
-            return match.group(0)
-        return f"\n\n@@@{header_text}@@@\n"
-
-    processed = re.sub(
-        r'(?<=[.!?\n])\s*([A-Z][a-z]+(?:\s+[A-Z][a-z]+){1,3})\s+(?=[a-z]{15,})',
-        generic_header_fix,
-        processed
-    )
     
     lines = processed.split('\n')
     formatted_lines = []
@@ -429,7 +378,6 @@ def format_description_markdown(text):
             formatted_lines.append('')
             continue
         
-        # Unmask protected headers
         is_protected = False
         if stripped.startswith("@@@") and stripped.endswith("@@@"):
             stripped = stripped.replace("@@@", "")
@@ -448,29 +396,25 @@ def format_description_markdown(text):
                 is_header = False
             elif re.search(r'^(EXTREMELY\s+)?(IMPORTANT|NOTE|TIP|WARNING|RECAP|HOW TO)\b', stripped.upper()):
                 is_header = True
-            elif len(stripped) < 40 and not stripped.endswith(('.', '!', '?')):
+            elif len(stripped) < 45 and not stripped.endswith(('.', '!', '?')) and 1 <= len(stripped.split()) <= 6:
                 words = stripped.split()
-                if 1 <= len(words) <= 5:
-                    capitalized = sum(1 for w in words if w and (w[0].isupper() or not w[0].isalpha()))
-                    if capitalized >= len(words) * 0.8 and words[0] not in EXCLUDED_WORDS:
-                        is_header = True
-            elif (stripped.endswith(':') or stripped.isupper()) and len(stripped) < 45:
+                # Check for Title Case
+                capitalized = sum(1 for w in words if w and (w[0].isupper() or not w[0].isalpha()))
+                if capitalized >= len(words) * 0.8 and words[0] not in EXCLUDED_WORDS:
+                    is_header = True
+            elif (stripped.endswith(':') or stripped.isupper()) and len(stripped) < 50:
                 is_header = True
         
         if is_header:
-            if formatted_lines and formatted_lines[-1]:
+            if formatted_lines and formatted_lines[-1] != '':
                 formatted_lines.append('')
             formatted_lines.append(f"**{stripped}**")
         else:
             formatted_lines.append(stripped)
 
-    
     # Join and clean up excessive newlines (max 2)
     result = '\n'.join(formatted_lines)
     result = re.sub(r'\n{3,}', '\n\n', result)
-    
-    # Final fix for vertical list items (join them if they are too sparse)
-    result = re.sub(r'([•·*])\s*\n\n', r'\1 ', result)
     
     return result.strip()
 
@@ -940,11 +884,13 @@ async def main():
                         overflow_text = full_desc[remaining:]
                         need_overflow = True
 
+            first_msg = None
             if upload_method == "user":
                  # User usually has 1 file
                  for f_path in processed_files:
                      msg = await upload_with_user_account(app, f_path, caption, channel_username, thumb=thumb_path if has_thumb else None)
                      if msg:
+                         if not first_msg: first_msg = msg
                          processed_count += 1
                          print(f"🎉 User account upload successful!")
                          # Save History & Update Manifest
@@ -953,20 +899,6 @@ async def main():
                          # Update manifest with status
                          msg_id = msg.id if hasattr(msg, 'id') else None
                          update_manifest_status(idx, "UPLOADED", msg_id=msg_id)
-                         
-                         # Send Overflow Message if needed
-                         if need_overflow and overflow_text:
-                             print("   📄 Description split. Sending remainder as reply...")
-                             try:
-                                 await app.send_message(
-                                     chat_id=channel_username,
-                                     text=f"📄 **Continued:**\n\n{overflow_text}",
-                                     reply_to_message_id=msg.id,
-                                     disable_web_page_preview=True
-                                 )
-                                 print("   ✅ Overflow message sent.")
-                             except Exception as exc:
-                                 print(f"   ⚠️ Failed to send overflow: {exc}")
                      else:
                          failed_count += 1
                          idx = get_index_from_filename(filename)
@@ -978,6 +910,7 @@ async def main():
                      part_caption = validate_caption(part_caption)  # Fix Markdown
                      msg = await upload_with_bot(f_path, part_caption, telegram_token, channel_id, thumb=thumb_path if has_thumb else None)
                      if msg:
+                         if not first_msg: first_msg = msg
                          processed_count += 1
                          print(f"🎉 Bot upload successful!")
                          # Save History & Update Manifest
@@ -991,6 +924,26 @@ async def main():
                          if j == 0:
                             idx = get_index_from_filename(filename)
                             update_manifest_status(idx, "FAILED")
+            
+            # ✅ SHARED: Send Overflow Message (Follow-up) if needed
+            if first_msg and need_overflow and overflow_text:
+                print("   📄 Description split. Sending remainder as reply...")
+                try:
+                    # Determine message ID (Pyrogram uses .id, Bot API uses .message_id)
+                    reply_id = getattr(first_msg, 'id', getattr(first_msg, 'message_id', None))
+                    
+                    if reply_id:
+                        await app.send_message(
+                            chat_id=channel_username,
+                            text=f"📄 **Continued:**\n\n{overflow_text}",
+                            reply_to_message_id=reply_id,
+                            disable_web_page_preview=True
+                        )
+                        print("   ✅ Overflow message sent.")
+                    else:
+                        print("   ⚠️ Could not determine message ID for overflow reply.")
+                except Exception as exc:
+                    print(f"   ⚠️ Failed to send overflow: {exc}")
             
             # Cleanup thumb
             if has_thumb and os.path.exists(thumb_path):
