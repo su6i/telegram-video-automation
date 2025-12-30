@@ -217,7 +217,7 @@ def load_extra_content(url):
 def unfragment_text(text):
     """
     Join fragmented lines into coherent sentences and paragraphs.
-    Much more conservative to preserve lists and headers.
+    Extremely conservative to preserve website structure, lists, and headers.
     """
     if not text: return ""
     
@@ -225,13 +225,16 @@ def unfragment_text(text):
     cleaned_lines = []
     current_buffer = ""
     
+    # Common list markers
+    LIST_MARKER_REGEX = r'^(\d+\.|[\-•·*]|->|=>|\.|>)\s+'
+    
     for line in lines:
         stripped = line.strip()
         if not stripped:
             if current_buffer:
                 cleaned_lines.append(current_buffer)
                 current_buffer = ""
-            cleaned_lines.append("") # Preserve intended breaks
+            cleaned_lines.append("") 
             continue
             
         if not current_buffer:
@@ -240,23 +243,30 @@ def unfragment_text(text):
             last_char = current_buffer[-1] if current_buffer else ""
             
             # Identify list items / headers
-            is_list_item = re.match(r'^(\d+\.|[\-•·*])\s+\S', stripped) or re.match(r'^\d+\.?$', stripped)
+            is_list_item = re.match(LIST_MARKER_REGEX, stripped) or re.match(r'^\d+\.?$', stripped)
             
-            PROTECTED_HEADERS = {'Your Robot Buddy', 'Superman', 'Swimming with sharks', 'Game of Thrones', 'Wizard', 'Pirate', 'EXTREMELY IMPORTANT', 'IMPORTANT NOTE', 'Lesson Recap', 'Prompt Template', 'Continued'}
-            is_protected_header = any(h.upper() in stripped.upper() for h in PROTECTED_HEADERS)
-            is_header = is_protected_header or (stripped.isupper() and len(stripped) < 40) or (stripped.endswith(':') and len(stripped) < 60)
+            PROTECTED_HEADERS = {'Your Robot Buddy', 'Superman', 'Swimming with sharks', 'Game of Thrones', 'Wizard', 'Pirate', 'EXTREMELY IMPORTANT', 'IMPORTANT NOTE', 'Lesson Recap', 'Prompt Template', 'Continued', 'Example Prompts'}
+            
+            # Header check for NEXT line
+            is_next_protected = any(h.upper() in stripped.upper() for h in PROTECTED_HEADERS)
+            is_next_header = is_next_protected or (stripped.isupper() and len(stripped) < 40) or (stripped.endswith(':') and len(stripped) < 60)
+            
+            # Header check for CURRENT buffer
+            is_buffer_protected = any(h.upper() in current_buffer.upper() for h in PROTECTED_HEADERS)
+            is_buffer_header = is_buffer_protected or (current_buffer.isupper() and len(current_buffer) < 40) or (current_buffer.endswith(':') and len(current_buffer) < 60)
             
             starts_lower = stripped[0].islower() if stripped and stripped[0].isalpha() else False
             
-            # ONLY join if it's a clear paragraph continuation
+            # ONLY join if it's a clear paragraph continuation and NOT a list item/header
             should_join = False
-            if is_list_item or is_header:
+            if is_list_item or is_next_header or is_buffer_header:
                 should_join = False
-            elif last_char in ",;:": # Clearly continuing (e.g. lists or commas)
+            elif last_char in ",;": 
                 should_join = True
-            elif last_char not in ".!?" and starts_lower: # Middle of a sentence
+            elif last_char not in ".!?" and starts_lower: # Middle of a sentence (lowercase starts)
                 should_join = True
-            elif len(current_buffer.split()) < 5 and not last_char in ".!?:;": # Extremely short fragment
+            # Extremely short lines with no punctuation might be fragments, but we only join if next doesn't look like a start
+            elif len(current_buffer.split()) < 4 and not last_char in ".!?:;" and starts_lower:
                 should_join = True
                 
             if should_join:
@@ -264,73 +274,51 @@ def unfragment_text(text):
             else:
                 cleaned_lines.append(current_buffer)
                 current_buffer = stripped
-                
+    
     if current_buffer:
         cleaned_lines.append(current_buffer)
         
-    return '\n'.join(cleaned_lines).strip()
-
-
-def escape_markdown_text(text):
-    """
-    Escape special Markdown characters in plain text to prevent parsing errors.
-    Preserves intentional formatting like **bold** and [links](url).
-    """
-    if not text:
-        return text
-    
-    # Count ** markers - must be even for valid Markdown
-    bold_count = text.count('**')
-    if bold_count % 2 != 0:
-        # Odd number of ** - remove the last one to fix
-        last_pos = text.rfind('**')
-        text = text[:last_pos] + text[last_pos+2:]
-    
-    # Escape underscores that aren't part of links
-    # But preserve _italic_ formatting if intended
-    text = re.sub(r'(?<!\[)_(?![\w\s]*\]\()', r'\_', text)
-    
-    return text
-
+    return "\n".join(cleaned_lines)
 
 def validate_caption(caption):
     """
     Validate and fix caption before sending to Telegram.
-    Ensures all Markdown markers are properly closed.
+    Ensures all Markdown markers are properly closed and protected.
+    Consolidated logic for safety and reliability.
     """
     if not caption:
         return caption
     
-    # Escape underscores that aren't part of italic formatting
-    # Replace standalone _ with \_ (but preserve __text__ italic)
-    # First, protect intentional _italic_ patterns
-    caption = re.sub(r'(?<!\w)_(\w+)_(?!\w)', r'ITALIC_START\1ITALIC_END', caption)
-    # Escape remaining underscores
-    caption = caption.replace('_', r'\_')
-    # Restore italic patterns
-    caption = caption.replace('ITALIC_START', '_').replace('ITALIC_END', '_')
+    # 1. Protect Markdown Links [text](url) from accidental character escapes
+    links = re.findall(r'\[([^\]]+)\]\(([^)]+)\)', caption)
+    placeholders = {}
+    for i, (text, url) in enumerate(links):
+        placeholder = f"MARKDOWN_LINK_PLACEHOLDER_{i}"
+        caption = caption.replace(f"[{text}]({url})", placeholder)
+        placeholders[placeholder] = f"[{text}]({url})"
     
-    # Fix unclosed ** markers
+    # 2. Handle Underscores safely (escape them so they don't trigger italics)
+    caption = caption.replace('_', r'\_')
+    
+    # 3. Restore Links (URLs should NOT have escaped underscores)
+    for placeholder, original_link in placeholders.items():
+        caption = caption.replace(placeholder, original_link)
+    
+    # 4. Fix unbalanced Bold (**) markers
     bold_count = caption.count('**')
     if bold_count % 2 != 0:
-        # Find the last unclosed ** and remove it
         last_pos = caption.rfind('**')
-        caption = caption[:last_pos] + caption[last_pos+2:]
-    
-    # Fix unclosed ` markers  
+        if last_pos > len(caption) - 15: # Near end
+            caption = caption[:last_pos] + caption[last_pos+2:] # Strip
+        else:
+            caption += '**' # Close
+            
+    # 5. Fix unbalanced Code (`) markers
     backtick_count = caption.count('`')
     if backtick_count % 2 != 0:
         last_pos = caption.rfind('`')
         caption = caption[:last_pos] + caption[last_pos+1:]
-    
-    # Fix unclosed [] or () in links
-    # Simple check: count should be equal
-    if caption.count('[') != caption.count(']'):
-        caption = caption.replace('[', '').replace(']', '')
-    if caption.count('(') != caption.count(')'):
-        # Only remove markdown-style parentheses, not regular ones
-        pass  # Too risky to auto-fix
-    
+        
     return caption
 
 
@@ -392,7 +380,10 @@ def format_description_markdown(text):
         
         # Additional detection for unprotected lines
         if not is_header:
-            if stripped in EXCLUDED_WORDS:
+            # DON'T treat list items as headers even if Title Cased
+            if re.match(r'^(\d+\.|[\-•·*]|->|=>|\.)\s+', stripped):
+                is_header = False
+            elif stripped in EXCLUDED_WORDS:
                 is_header = False
             elif re.search(r'^(EXTREMELY\s+)?(IMPORTANT|NOTE|TIP|WARNING|RECAP|HOW TO)\b', stripped.upper()):
                 is_header = True
@@ -695,13 +686,16 @@ async def main():
                             
                             if not match_text: match_text = "Link"
                             
-                            # Pattern to find the anchor text followed by optional colon or space
-                            # We search for it in the description to replace it
-                            if match_text.lower() in desc.lower():
-                                # Case-insensitive replacement while keeping original casing if possible
-                                pattern = re.compile(re.escape(match_text), re.IGNORECASE)
+                            # Clean description matching (ignore common bullet differences)
+                            # Website might have blue bullets, scraper might have • or . or - 
+                            clean_desc = re.sub(r'^[•·*.\-]\s+', '', desc, flags=re.MULTILINE)
+                            
+                            # Searching for original casing and common variations
+                            if match_text.lower() in clean_desc.lower():
+                                # Match in original description
+                                pattern = re.compile(rf"(?i)(?:[•·*.\-]\s*)?{re.escape(match_text)}", re.IGNORECASE)
                                 if pattern.search(desc):
-                                    desc = pattern.sub(f"[{match_text}]({url})", desc)
+                                    desc = pattern.sub(f"• [{match_text}]({url})", desc)
                                     continue # Successfully inlined, don't add to header
                             
                             remaining_links.append(link)
@@ -907,7 +901,7 @@ async def main():
                  # Bot
                  for j, f_path in enumerate(processed_files):
                      part_caption = caption if len(processed_files) == 1 else f"{caption}\n(Part {j+1}/{len(processed_files)})"
-                     part_caption = validate_caption(part_caption)  # Fix Markdown
+                     part_caption = validate_caption(part_caption) 
                      msg = await upload_with_bot(f_path, part_caption, telegram_token, channel_id, thumb=thumb_path if has_thumb else None)
                      if msg:
                          if not first_msg: first_msg = msg
