@@ -42,22 +42,27 @@ def detect_hw_encoder():
         # Check in priority order
         if 'h264_videotoolbox' in encoders:
             _hw_encoder_cache = 'h264_videotoolbox'
-            print("⚡ Hardware acceleration: Apple VideoToolbox detected")
+            print("⚡ Hardware acceleration: Apple VideoToolbox (GPU encoding)")
         elif 'h264_nvenc' in encoders:
             _hw_encoder_cache = 'h264_nvenc'
-            print("⚡ Hardware acceleration: NVIDIA NVENC detected")
+            print("⚡ Hardware acceleration: NVIDIA NVENC (GPU encoding)")
         elif 'h264_qsv' in encoders:
             _hw_encoder_cache = 'h264_qsv'
-            print("⚡ Hardware acceleration: Intel QuickSync detected")
+            print("⚡ Hardware acceleration: Intel QuickSync (GPU encoding)")
         else:
             _hw_encoder_cache = 'libx264'
-            print("ℹ️ Using CPU encoding (libx264)")
+            print("ℹ️ Using CPU encoding (libx264) - this will be slower")
             
     except Exception:
         _hw_encoder_cache = 'libx264'
-        print("ℹ️ Using CPU encoding (libx264)")
+        print("ℹ️ Using CPU encoding (libx264) - this will be slower")
     
     return _hw_encoder_cache
+
+def reset_hw_encoder_cache():
+    """Reset the hardware encoder cache (useful for testing)."""
+    global _hw_encoder_cache
+    _hw_encoder_cache = None
 
 def check_disk_space(required_mb, path='.'):
     """Check if enough disk space is available."""
@@ -374,7 +379,10 @@ async def process_video_for_bot_safe(input_path, output_path, title, add_intro=F
             if encoder == 'libx264':
                 process_cmd.extend(["-preset", "fast", "-crf", "23"])
             elif encoder == 'h264_videotoolbox':
-                process_cmd.extend(["-q:v", "65"])
+                # VideoToolbox: Use average bitrate for speed
+                process_cmd.extend(["-b:v", "4M", "-maxrate", "6M", "-bufsize", "8M"])
+            elif encoder == 'h264_nvenc':
+                process_cmd.extend(["-preset", "fast", "-cq", "23"])
             else:
                 process_cmd.extend(["-preset", "fast"])
             
@@ -512,11 +520,15 @@ async def process_video_for_user_safe(input_path, output_path, title, add_intro=
                 "-ar", "44100",
                 "-ac", "2",
             ]
-            # Encoder-specific options
+            # Encoder-specific options for speed + quality balance
             if encoder == 'libx264':
                 process_cmd.extend(["-preset", "fast", "-crf", "23"])
             elif encoder == 'h264_videotoolbox':
-                process_cmd.extend(["-q:v", "65"])
+                # VideoToolbox: Use average bitrate for speed (no 2-pass needed)
+                # 4Mbps is good for 720p streaming
+                process_cmd.extend(["-b:v", "4M", "-maxrate", "6M", "-bufsize", "8M"])
+            elif encoder == 'h264_nvenc':
+                process_cmd.extend(["-preset", "fast", "-cq", "23"])
             else:
                 process_cmd.extend(["-preset", "fast"])
             
