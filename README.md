@@ -41,8 +41,22 @@ The system is designed to be a fully automated bridge between web content and Te
    - 🎬 **Smart Intro Generation**: Optional title cards with automatic re-encoding
    - 📐 **Correct Aspect Ratio**: Proper width/height metadata for both Bot and User uploads
    - 🔗 **Intelligent Link Placement**: Links are embedded inline within descriptions
+   - 🖥️ **Auto Hardware Acceleration**: Detects Apple/NVIDIA/Intel GPU, falls back to CPU
 
 ---
+
+## 🛠️ Command Line Options
+
+```bash
+./upload.sh [OPTIONS]
+
+Options:
+  --intro           Add title card intro to videos
+  --res 720|1080    Target resolution (default: 720)
+  --index-offset N  Skip N messages before index
+  --dry-run         Preview without uploading
+  --cleanup         Remove processed files after upload
+```
 
 ---
 
