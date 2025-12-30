@@ -840,7 +840,7 @@ async def main():
                  for j, f_path in enumerate(processed_files):
                      part_caption = caption if len(processed_files) == 1 else f"{caption}\n(Part {j+1}/{len(processed_files)})"
                      part_caption = validate_caption(part_caption)  # Fix Markdown
-                      msg = await upload_with_bot(f_path, part_caption, telegram_token, channel_id, thumb=thumb_path if has_thumb else None)
+                     msg = await upload_with_bot(f_path, part_caption, telegram_token, channel_id, thumb=thumb_path if has_thumb else None)
                      if msg:
                          processed_count += 1
                          print(f"🎉 Bot upload successful!")
