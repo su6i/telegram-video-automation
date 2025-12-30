@@ -713,8 +713,9 @@ async def main():
                 try: os.remove(thumb_path)
                 except: pass
             
-            # Cleanup temp files
-            if processing_needed: 
+            # Cleanup temp files (when processing was needed OR --cleanup flag is set)
+            should_cleanup = processing_needed or args.cleanup
+            if should_cleanup and processed_files: 
                 print("🧹 Cleaning up temporary files...")
                 for f_path in processed_files:
                     try:

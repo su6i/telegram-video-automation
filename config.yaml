@@ -1,0 +1,60 @@
+# Telegram Video Automation Kit - Configuration
+# ================================================
+# This file contains default settings for the upload pipeline.
+# Command-line arguments override these settings.
+
+# Video Processing
+video:
+  # Target resolution (720 or 1080)
+  target_resolution: 720
+  
+  # Add intro title card to videos
+  add_intro: false
+  
+  # FFmpeg preset (ultrafast, fast, medium, slow)
+  # faster = less compression, larger files
+  # slower = better compression, smaller files
+  encoding_preset: fast
+  
+  # CRF quality (18-28, lower = higher quality)
+  # 23 is a good balance between quality and size
+  crf_quality: 23
+
+# Upload Settings
+upload:
+  # Delay between uploads in seconds
+  bot_delay: 30
+  user_delay: 120
+  
+  # Maximum file size for bot upload (MB)
+  bot_max_size_mb: 45
+  
+  # Maximum file size for user upload (MB)
+  user_max_size_mb: 1900
+
+# Index Settings
+index:
+  # Message ID offset for Table of Contents
+  offset: 0
+  
+  # Number of placeholder messages to reserve
+  placeholder_count: 15
+
+# Cleanup
+cleanup:
+  # Remove processed files after successful upload
+  auto_cleanup: false
+  
+  # Remove thumbnail files after upload
+  remove_thumbnails: true
+
+# Logging
+logging:
+  # Save logs to file
+  enabled: false
+  
+  # Log file path
+  file: .storage/upload.log
+  
+  # Log level (DEBUG, INFO, WARNING, ERROR)
+  level: INFO
