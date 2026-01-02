@@ -208,3 +208,9 @@ This project serves as a showcase for robust automation and media engineering:
 ---
 
 **Next Steps:** Check the [Quick Start Guide](QUICK_START.md) for detailed environment setup.
+
+## 🤝 Contributing
+Contributions are welcome! Please check the issues page or submit a Pull Request.
+
+## 📄 License
+This project is licensed under the MIT License.
