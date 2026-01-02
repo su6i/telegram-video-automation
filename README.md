@@ -1,8 +1,24 @@
-# Telegram Video Automation Kit
+<div align="center">
+  <img src="assets/project_logo.svg" width="350" alt="Telegram Video Kit Logo">
+  <h1>Telegram Video Automation Kit</h1>
 
-[![LinkedIn](https://img.shields.io/badge/Connect-LinkedIn-blue?style=flat-square&logo=linkedin)](https://www.linkedin.com/in/su6i/)
+  ![Version](https://img.shields.io/badge/Version-2.1.0-blue.svg)
+  ![Python](https://img.shields.io/badge/Python-3.9+-yellow.svg)
+  ![License](https://img.shields.io/badge/License-MIT-green.svg)
+  <a href="https://www.linkedin.com/in/su6i/">
+    <img src="assets/linkedin_su6i.svg" height="20" alt="LinkedIn">
+  </a>
+</div>
+
+
 
 **Navigation:** [README](README.md) | [Quick Start](QUICK_START.md) | [Scan & Resume](SCAN_RESUME.md)
+
+<div align="center">
+  <a href="https://www.linkedin.com/in/su6i/">
+    <img src="assets/linkedin_su6i.svg" height="20" alt="LinkedIn">
+  </a>
+</div>
 
 ---
 
@@ -35,6 +51,7 @@ The system is designed to be a fully automated bridge between web content and Te
 
 ### 🧩 Core Components
 1. **🔍 Scan**: Initializes the mapping of content hierarchy and metadata via `scraper.py`.
+   - Use `./scan.sh --update-metadata` to force-refresh all lesson descriptions and links from the website (useful if formatting or links have changed).
 2. **📥 Download**: Asynchronously fetches media assets into the local environment.
 3. **🚀 Upload**: A high-performance pipeline featuring:
    - ⚡ **Strict Resolution Control**: Automatically scales and pads videos to **720p (1280x720)** or 1080p, strictly preserving original aspect ratios.
@@ -47,10 +64,44 @@ The system is designed to be a fully automated bridge between web content and Te
 
 ## 🛠️ Command Line Options
 
+## 🕹️ Workflow
+
+Follow these three steps in order for a complete automation cycle:
+
+### 1️⃣ Scan & Archive (`./scan.sh`)
+This command maps the entire course structure and **immediately archives all non-video content**.
 ```bash
-./upload.sh [OPTIONS]
+./scan.sh [OPTIONS]
 
 Options:
+  --update-metadata  Force re-scrape of descriptions/links for already scanned items.
+  --visible          Show browser window (essential for solving Cloudflare/Login).
+  --limit <N>        Only scan the first N lessons (perfect for testing).
+  --offset <N>       Skip the first N lessons (useful for resuming after an error).
+```
+- **What it does:** 
+  - 📂 **Full Page Archiving**: Saves the complete HTML of every lesson page.
+  - 🖼️ **Asset Preservation**: Downloads all images and CSS used in the lessons.
+  - 📎 **Attachment Grabber**: Automatically downloads PDFs, ZIPs, DOCX, and other files.
+  - 📋 **Manifest Creation**: Builds the `downloaded_video.txt` list for the next step.
+
+### 2️⃣ Download Videos (`./download.sh`)
+```bash
+./download.sh [OPTIONS]
+
+Options:
+  --force            Re-download videos even if they already exist on disk.
+```
+- **What it does:** Fetches the actual MP4/MOV files using the URLs found in Step 1.
+
+### 3️⃣ Upload to Telegram (`./upload.sh`)
+Processes videos and uploads them to your Telegram channel with rich captions.
+```bash
+./upload.sh [OPTIONS]
+```
+Options:
+  --force-upload     Re-upload files even if they are in the history.
+  --skip-history     Upload without saving to history.
   --intro           Add title card intro to videos
   --res 720|1080    Target resolution (default: 720)
   --index-offset N  Skip N messages before index

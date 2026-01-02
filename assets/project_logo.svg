@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 120">
+    <!-- Telegram Video Automation Logo -->
+
+    <!-- Background: Telegram Blue -->
+    <rect x="0" y="0" width="400" height="120" rx="20" fill="#24A1DE" />
+
+    <!-- Icon: Paper Plane -->
+    <g transform="translate(30, 20) scale(0.8)">
+        <circle cx="40" cy="40" r="40" fill="white" />
+        <path d="M25 40 L60 25 L35 55 L35 40 Z" fill="#24A1DE" transform="translate(5, 5)" />
+    </g>
+
+    <!-- Text -->
+    <text x="120" y="60" font-family="Arial, sans-serif" font-weight="bold" font-size="32" fill="white">
+        TG Video Kit
+    </text>
+
+    <!-- Subtext -->
+    <text x="125" y="90" font-family="Arial, sans-serif" font-size="16" fill="#E1F5FE" font-style="italic">
+        Scan, Download, Automate
+    </text>
+</svg>
