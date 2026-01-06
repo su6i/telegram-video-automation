@@ -249,11 +249,16 @@ def unfragment_text(text):
             
             # Header check for NEXT line
             is_next_protected = any(h.upper() in stripped.upper() for h in PROTECTED_HEADERS)
-            is_next_header = is_next_protected or (stripped.isupper() and len(stripped) < 40) or (stripped.endswith(':') and len(stripped) < 60)
+            # Add TitleCase check for fragments
+            is_next_titlecase = len(stripped) < 50 and sum(1 for w in stripped.split() if w and (w[0].isupper() or not w[0].isalpha())) >= len(stripped.split()) * 0.6
+            
+            is_next_header = is_next_protected or is_next_titlecase or (stripped.isupper() and len(stripped) < 40) or (stripped.endswith(':') and len(stripped) < 60)
             
             # Header check for CURRENT buffer
             is_buffer_protected = any(h.upper() in current_buffer.upper() for h in PROTECTED_HEADERS)
-            is_buffer_header = is_buffer_protected or (current_buffer.isupper() and len(current_buffer) < 40) or (current_buffer.endswith(':') and len(current_buffer) < 60)
+            is_buffer_titlecase = len(current_buffer) < 50 and sum(1 for w in current_buffer.split() if w and (w[0].isupper() or not w[0].isalpha())) >= len(current_buffer.split()) * 0.6
+            
+            is_buffer_header = is_buffer_protected or is_buffer_titlecase or (current_buffer.isupper() and len(current_buffer) < 40) or (current_buffer.endswith(':') and len(current_buffer) < 60)
             
             starts_lower = stripped[0].islower() if stripped and stripped[0].isalpha() else False
             
@@ -389,9 +394,9 @@ def format_description_markdown(text):
                 is_header = True
             elif len(stripped) < 45 and not stripped.endswith(('.', '!', '?')) and 1 <= len(stripped.split()) <= 6:
                 words = stripped.split()
-                # Check for Title Case
+                # Check for Title Case - Lowered threshold to 0.6 to catch "Text to Video Links"
                 capitalized = sum(1 for w in words if w and (w[0].isupper() or not w[0].isalpha()))
-                if capitalized >= len(words) * 0.8 and words[0] not in EXCLUDED_WORDS:
+                if capitalized >= len(words) * 0.6 and words[0] not in EXCLUDED_WORDS:
                     is_header = True
             elif (stripped.endswith(':') or stripped.isupper()) and len(stripped) < 50:
                 is_header = True
@@ -867,7 +872,6 @@ async def main():
                     if last_break < remaining * 0.5: last_break = max(candidate.rfind('. '), candidate.rfind('? '), candidate.rfind('! '))
                     if last_break < remaining * 0.5: last_break = candidate.rfind('\n')
                     if last_break < remaining * 0.5: last_break = candidate.rfind(' ')
-                    
                     if last_break > 0:
                         visible = full_desc[:last_break+1].strip()
                         overflow_text = full_desc[last_break+1:].strip()
@@ -877,6 +881,11 @@ async def main():
                         caption += f"📝 **Info:**\n{candidate}..."
                         overflow_text = full_desc[remaining:]
                         need_overflow = True
+
+            # CRITICAL: Always validate caption before sending
+            caption = validate_caption(caption)
+            if overflow_text:
+                overflow_text = validate_caption(overflow_text)
 
             first_msg = None
             if upload_method == "user":
