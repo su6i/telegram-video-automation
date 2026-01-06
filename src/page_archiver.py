@@ -98,18 +98,46 @@ def archive_page(page_url, page_title=None):
             except Exception as e:
                 print(f"    ⚠️ Failed to download {img_url}: {e}")
         
-        # Extract all links
-        print("  🔗 Extracting links...")
+        # Extract links and download attachments (PDF, ZIP, etc.)
+        doc_extensions = ['.pdf', '.zip', '.docx', '.doc', '.xlsx', '.xls', '.mp3', '.pptx', '.txt']
+        print("  📎 Downloading attachments...")
         for link in soup.find_all('a'):
             href = link.get('href')
             text = link.get_text(strip=True)
-            if href and text:
-                full_url = urljoin(page_url, href)
-                results['links'].append({
-                    'text': text,
-                    'url': full_url,
-                    'anchor': href
-                })
+            if not href:
+                continue
+            
+            full_url = urljoin(page_url, href)
+            results['links'].append({
+                'text': text,
+                'url': full_url,
+                'anchor': href
+            })
+
+            # Check if it's an attachment
+            ext = os.path.splitext(urlparse(full_url).path)[1].lower()
+            if ext in doc_extensions:
+                try:
+                    # Sanitize filename from URL or text
+                    doc_name = os.path.basename(urlparse(full_url).path)
+                    if not doc_name or len(doc_name) < 4:
+                        doc_name = "".join(x for x in text if x.isalnum() or x in "._- ")[:40] + ext
+                    
+                    doc_path = os.path.join(page_dir, 'attachments', doc_name)
+                    if os.path.exists(doc_path):
+                        continue
+                        
+                    os.makedirs(os.path.dirname(doc_path), exist_ok=True)
+                    print(f"    📩 Downloading attachment: {doc_name}")
+                    doc_response = requests.get(full_url, timeout=30, headers={
+                        'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7)'
+                    })
+                    doc_response.raise_for_status()
+                    with open(doc_path, 'wb') as f:
+                        f.write(doc_response.content)
+                    results['assets_count'] += 1
+                except Exception as e:
+                    print(f"    ⚠️ Failed to download attachment {full_url}: {e}")
         
         # Save original HTML
         html_path = os.path.join(page_dir, 'index.html')
