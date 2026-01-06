@@ -1,24 +1,23 @@
 <div align="center">
   <img src="assets/project_logo.svg" width="350" alt="Telegram Video Kit Logo">
   <h1>Telegram Video Automation Kit</h1>
+  
+  <p>A modular, robust, and automated pipeline to scrape, process, and upload videos to Telegram Channels.</p>
 
-  ![Version](https://img.shields.io/badge/Version-2.1.0-blue.svg)
-  ![Python](https://img.shields.io/badge/Python-3.9+-yellow.svg)
-  ![License](https://img.shields.io/badge/License-MIT-green.svg)
-  <a href="https://www.linkedin.com/in/su6i/">
-    <img src="assets/linkedin_su6i.svg" height="20" alt="LinkedIn">
-  </a>
+  <p align="center">
+    <img src="https://img.shields.io/badge/Python-3.10+-blue.svg?logo=python&logoColor=white" alt="Python">
+    <img src="https://img.shields.io/badge/Telegram-Pyrogram-qc.svg?logo=telegram&logoColor=white" alt="Telegram">
+    <img src="https://img.shields.io/badge/FFmpeg-Required-green.svg?logo=ffmpeg&logoColor=white" alt="FFmpeg">
+    <img src="https://img.shields.io/badge/License-MIT-yellow.svg" alt="License">
+    <a href="https://www.linkedin.com/in/su6i/">
+      <img src="assets/linkedin_su6i.svg" height="20" alt="LinkedIn">
+    </a>
+  </p>
 </div>
 
 
 
 **Navigation:** [README](README.md) | [Quick Start](QUICK_START.md) | [Scan & Resume](SCAN_RESUME.md)
-
-<div align="center">
-  <a href="https://www.linkedin.com/in/su6i/">
-    <img src="assets/linkedin_su6i.svg" height="20" alt="LinkedIn">
-  </a>
-</div>
 
 ---
 
