@@ -146,7 +146,19 @@ class ManifestManager:
         
         final_videos.extend(new_found)
         
-        # 4. Renumber Sequentially
+        # 4. SORT & Renumber Sequentially
+        # Sort key: Course -> Section -> Subsection (empty last) -> Title
+        def sort_key(v):
+            return (
+                v.get('course_title', 'zzz'), 
+                v.get('section', 'zzz'), 
+                v.get('subsection') or '',
+                # Try to keep existing index order if possible, else title
+                int(v['index']) if v['index'] and v['index'].isdigit() else 999999
+            )
+            
+        final_videos.sort(key=sort_key)
+        
         for idx, v in enumerate(final_videos, 1):
             v['index'] = f"{idx:03d}"
         

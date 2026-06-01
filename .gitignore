@@ -30,3 +30,5 @@ debug_*.html
 # OS
 .DS_Store
 Thumbs.db
+prompts/gen_*.txt
+prompts/task_*.txt

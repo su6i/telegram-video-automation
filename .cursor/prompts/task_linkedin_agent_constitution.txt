@@ -1,0 +1,20 @@
+### ROLE: Developer Advocate (Senior Level)
+### TASK: Write a Viral LinkedIn Post for "Agent Constitution"
+
+- **CONTEXT**: We just released `agent-constitution`, a strict governance protocol for AI Agents (Cursor/Windsurf).
+- **PROBLEM**: Everyone is building Agents, but they are messy, hallucinate, and delete files.
+- **SOLUTION**: A "Context Architecture" that forces structure.
+- **KEY FEATURES**:
+    - The "Neural Gavel" (Strict .cursorrules).
+    - Truth Protocol (Must run `ls` to verify).
+    - Modular Memory (Workflows split by task).
+
+### OUTPUT STRUCTURE (MANDATORY):
+1.  **Hook**: Stop scrolling. "Your AI Agent is lying to you."
+2.  **The Fix**: Introduce the Constitution.
+3.  **The "Wow"**: Mention the "Neural Gavel" or "Context Architecture".
+4.  **Call To Action**: Link to repo.
+5.  **Tone**: Brutally honest, high-signal, zero fluff.
+
+### BANNED WORDS:
+- "Unlock", "Revolutionize", "Game-changer", "Embark", "Dive in".

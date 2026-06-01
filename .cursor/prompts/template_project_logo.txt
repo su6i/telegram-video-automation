@@ -1,0 +1,12 @@
+### ROLE: Professional Graphic Designer
+### TASK: Create a high-quality, minimalist GitHub Repository Banner
+
+- **DIMENSIONS**: 3.33:1 Aspect Ratio (optimized for 400x120px)
+- **COMPOSITION**: Split layout. 
+    - Left: A modern, sleek vector icon representing [INSERT THEME, e.g., Cloud Computing].
+    - Right: Bold, futuristic sans-serif text reading "[INSERT PROJECT NAME]".
+- **STYLE**: Minimalist, High-tech, Flat design, Vector art.
+- **COLOR PALETTE**: [INSERT COLORS, e.g., Dark Mode Charcoal with Emerald Green accents].
+- **BACKGROUND**: Solid dark aesthetic with subtle, low-opacity geometric patterns (hexagons or grid lines).
+- **QUALITY**: 4k resolution, sharp edges, no blur, professional developer UI/UX aesthetic.
+- **CONSTRAINTS**: Centered and balanced, clean lines, high contrast for readability on GitHub.
