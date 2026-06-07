@@ -32,3 +32,4 @@ debug_*.html
 Thumbs.db
 prompts/gen_*.txt
 prompts/task_*.txt
+TODO.md

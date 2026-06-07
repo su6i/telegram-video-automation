@@ -33,14 +33,8 @@ done
 echo "🚀 Starting upload process..."
 echo "📊 Settings: Resolution=${RES}p, Add Intro=${INTRO}, Index Offset=${INDEX_OFFSET}"
 
-# Check for virtual environment
-if [ -f ".venv/bin/activate" ]; then
-    echo "🌐 Activating virtual environment..."
-    source .venv/bin/activate
-fi
-
 # Run the python script
-CMD="python3 scripts/process_and_upload.py --res $RES"
+CMD="uv run scripts/process_and_upload.py --res $RES"
 if [[ "$INTRO" == "true" ]]; then
     CMD="$CMD --intro"
 fi

@@ -17,7 +17,6 @@ You are strictly bound by the defined Workflows. You simply CANNOT execute a tas
 - **Unified Entry:** Every project has exactly ONE `main.py` entry point.
 - **Tools:** Use `uv` for everything Python. No exceptions.
 - **Docs:** Docs are living entities. Update them after EVERY task.
-- **i18n:** All projects must support English, French, and Persian (Farsi) from day one.
 - **Config:**
     - Non-sensitive -> `config.yaml`
     - Secrets -> `.env` (with `.env.example`)

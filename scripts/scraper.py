@@ -5,6 +5,7 @@ import concurrent.futures
 from tqdm import tqdm
 import yt_dlp
 import json
+import re
 
 # Add project root to sys.path
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -13,17 +14,21 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 # Moved to inside scan_videos to prevent startup hang
 from src.page_archiver import archive_page
 from src.media_library import MediaLibrary
+# from src.manifest_manager import ManifestManager # Can't use global import if it needs dynamic paths? 
+# Actually we can pass paths to ManifestManager
+
+from src import config
+
+# Dynamic Configuration
+STORAGE_DIR = config.get_path("base_dir")
+CONTENT_FILE = config.get_path("content_file")
+MANIFEST_FILE = config.get_path("manifest_file")
+OUTPUT_DIR = config.get_path("downloads_dir")
+FAILED_LOG = config.get_path("failed_log")
+
+# Initialize Manager (Import after config load)
 from src.manifest_manager import ManifestManager
-from src.reporter import print_detailed_statistics
-
-STORAGE_DIR = ".storage"
-CONTENT_FILE = os.path.join(STORAGE_DIR, "scraped_content.json")
-MANIFEST_FILE = os.path.join(STORAGE_DIR, "downloaded_video.txt")
-OUTPUT_DIR = "downloads"
-FAILED_LOG = os.path.join(STORAGE_DIR, "failed_downloads.txt")
-
-# Initialize Manager
-manifest_mgr = ManifestManager(storage_dir=STORAGE_DIR, manifest_filename="downloaded_video.txt")
+manifest_mgr = ManifestManager(storage_dir=STORAGE_DIR, manifest_filename=os.path.basename(MANIFEST_FILE))
 
 def scan_videos(limit=None, update_metadata=False, offset=0, verbose=False):
     print(f"🚀 Starting Phased Scan... (Offset: {offset})")
@@ -81,7 +86,10 @@ def scan_videos(limit=None, update_metadata=False, offset=0, verbose=False):
             collected_lessons.append(lesson_data)
             
             # Incremental Save
-            if len(collected_lessons) % 5 == 0:
+            # If verbose, save EVERY time for debugging. Else save every 5.
+            save_interval = 1 if verbose else 5
+            
+            if len(collected_lessons) % save_interval == 0:
                  manifest_mgr.save_manifest(collected_lessons)
 
         # Execute Extraction
@@ -120,28 +128,90 @@ def download_videos(force=False):
     print(f"📂 Loading manifest: {MANIFEST_FILE}")
     videos_to_download = []
     
+    current_course = "Unknown Course"
+    current_section = "General"
+    
+    # Regex to parse 'Index_Title' (supports '001_Title' and '039_1_Title')
+    index_title_pattern = re.compile(r"^(\d+(?:_\d+)?)_(.*)$")
+
     with open(MANIFEST_FILE, "r", encoding="utf-8") as f:
         for line in f:
             line = line.strip()
-            if not line or line.startswith("#"): continue
+            if not line: continue
+            
+            # Context Tracking
+            if line.startswith("# === "):
+                current_course = line.replace("# === ", "").replace(" ===", "").strip()
+                current_section = "General" # Reset section on new course
+                continue
+            if line.startswith("## --- "):
+                current_section = line.replace("## --- ", "").replace(" ---", "").strip()
+                continue
+            if line.startswith("#"): continue
             
             parts = [p.strip() for p in line.split("|")]
-            if len(parts) < 3: continue
             
-            index_str = parts[0]
-            url = parts[2]
-            title = parts[1]
-            course = parts[3] if len(parts) > 3 else "Unknown Course"
-            section = parts[4] if len(parts) > 4 else "General"
+            parts = [p.strip() for p in line.split("|")]
             
-            if not url.startswith("http"): continue
+            # --- Smart Parse: Find URL ---
+            url_idx = -1
+            for i, p in enumerate(parts):
+                if p.startswith("http"):
+                    url_idx = i
+                    break
+            
+            if url_idx == -1: continue # No URL found
+            
+            url = parts[url_idx]
+            
+            # --- Extract Metadata (Course/Section) ---
+            # Default to context
+            vid_course = current_course
+            vid_section = current_section
+            
+            # If explicit columns exist AFTER the URL
+            if len(parts) > url_idx + 1:
+                vid_course = parts[url_idx+1]
+            if len(parts) > url_idx + 2:
+                vid_section = parts[url_idx+2]
+
+            # --- Extract Index & Title ---
+            # Everything BEFORE the URL
+            pre_url_parts = parts[:url_idx]
+            
+            index_str = "999"
+            title = "Unknown"
+            
+            if pre_url_parts:
+                first = pre_url_parts[0]
+                # Check for pure index: "001" or "039_4"
+                if re.match(r"^\d+(?:_\d+)?$", first) and len(pre_url_parts) > 1:
+                    # Format: Index | Title
+                    index_str = first
+                    title = " - ".join(pre_url_parts[1:])
+                else:
+                    # Format: Index_Title (or just Title)
+                    # Try to split Index_Title
+                    match = index_title_pattern.match(first)
+                    if match:
+                        index_str = match.group(1)
+                        t_prefix = match.group(2)
+                        # Append any other cols (e.g. Index_Prefix | Suffix)
+                        if len(pre_url_parts) > 1:
+                            title = t_prefix + " - " + " - ".join(pre_url_parts[1:])
+                        else:
+                            title = t_prefix
+                    else:
+                        # Fallback: No index found in first part
+                        # e.g. "Just a Title"
+                        title = " - ".join(pre_url_parts)
 
             videos_to_download.append({
                 "index": index_str,
                 "title": title,
                 "url": url,
-                "course": course,
-                "section": section
+                "course": vid_course,
+                "section": vid_section
             })
 
     total_videos = len(videos_to_download)
@@ -288,8 +358,251 @@ def archive_manifest_pages():
     for item in urls:
         archive_page(item['url'], item['title'])
 
+def calculate_next_index(manifest_path, course, section):
+    """
+    Calculates the next appropriate index for a video in a specific section.
+    Returns something like '039_X' or a new sequential number.
+    """
+    if not os.path.exists(manifest_path): return "001"
+    
+    last_index_in_section = None
+    max_global_index = 0
+    
+    with open(manifest_path, 'r', encoding='utf-8') as f:
+        for line in f:
+            if "|" not in line or line.strip().startswith("#"): continue
+            parts = [p.strip() for p in line.split("|")]
+            if len(parts) < 5: continue
+            
+            idx = parts[0]
+            c = parts[3]
+            s = parts[4]
+            
+            # Global max tracker (for purely new sections)
+            if idx.isdigit():
+                 max_global_index = max(max_global_index, int(idx))
+            
+            # Match Course and Section
+            if c == course and s == section:
+                last_index_in_section = idx
+
+    if last_index_in_section:
+        # If last index was '039' or '039_3', we want next sub-index
+        base = last_index_in_section.split("_")[0]
+        if "_" in last_index_in_section:
+            try:
+                sub = int(last_index_in_section.split("_")[1])
+                return f"{base}_{sub + 1}"
+            except: return f"{base}_{1}"
+        else:
+            return f"{base}_1"
+    else:
+        # New section? Just increment global max
+        return f"{max_global_index + 1:03d}"
+
+def process_single_url(url, verbose=False, download=True):
+    print(f"🔗 Processing Single URL: {url}")
+    if not download:
+        print("   🔍 Scan Mode: Metadata will be extracted and indexed, but NOT downloaded.")
+    
+    # Lazy Import
+    try:
+        from src.scrapers.primary_scraper import PrimaryScraper
+    except ImportError as e:
+        print(f"❌ Scraper import failed: {e}")
+        import traceback
+        traceback.print_exc()
+        return
+
+    scraper = PrimaryScraper()
+    try:
+        # 1. Get Details
+        details = scraper.get_lesson_details(url)
+    except Exception as e:
+        print(f"❌ Failed to get details: {e}")
+        return
+
+    # Prepare Metadata
+    title = details.get('title', 'Untitled')
+    course = details.get('course_title', 'Unknown Course')
+    section = details.get('section', 'General')
+    video_url = details.get('url')
+    
+    print(f"   📘 Course: {course}")
+    print(f"   📂 Section: {section}")
+    print(f"   📝 Title: {title}")
+    
+    # --- Interactive Metadata Correction ---
+    if section == "General":
+        print(f"   ⚠️  Section detection defaulted to 'General'.")
+        user_sec = input(f"   ✍️  Enter correct Section name (or Press Enter to keep '{section}'): ").strip()
+        if user_sec:
+            section = user_sec
+            details['section'] = section # Update details dict for metadata.json
+
+    # Calculate Index based on (potentially new) section
+    suggested_index = calculate_next_index(MANIFEST_FILE, course, section)
+    print(f"   🔢 Proposed Index: {suggested_index}")
+    
+    user_idx = input(f"   ✍️  Enter Index (or Press Enter to keep '{suggested_index}'): ").strip()
+    if user_idx:
+        index_str = user_idx
+    else:
+        index_str = suggested_index
+
+    # 2. Update Manifest
+    # CRITICAL: Use the extracted VIDEO URL (e.g. Wistia embed), not the page URL.
+    manifest_url = video_url if video_url else url
+    
+    new_entry = {
+         "index": index_str,
+         "title": title,
+         "url": manifest_url,
+         "course": course,
+         "section": section
+    }
+    insert_into_manifest(new_entry)
+            
+    print(f"   ✅ Final Metadata: [{index_str}] {course} > {section} > {title}")
+
+    if download:
+        # 3. Archive Page
+        # We want to put it in downloads/Course/Section/Title_Page/
+        sanitized_course = _sanitize_folder_name(course)
+        sanitized_section = _sanitize_folder_name(section)
+        sanitized_title = _sanitize_folder_name(title)
+        
+        target_base = os.path.join(OUTPUT_DIR, sanitized_course, sanitized_section)
+        archive_dir = os.path.join(target_base, f"{sanitized_title}_Assets")
+        
+        print(f"   📦 Archiving to: {archive_dir}")
+        archive_report = archive_page(url, title, output_dir=archive_dir)
+        
+        # Save Metadata
+        if archive_report.get('success'):
+             meta_file = os.path.join(archive_dir, "metadata_full.json")
+             with open(meta_file, "w", encoding="utf-8") as f:
+                 json.dump(details, f, indent=2, ensure_ascii=False)
+            
+        # 4. Download Video
+        if video_url:
+            print(f"   ⬇️ Downloading video...")
+            # Mock pbar
+            class MockPbar:
+                def update(self, n): pass
+                def close(self): pass
+                def refresh(self): pass
+                n = 0
+                
+            success = _download_single(
+                video_url, 
+                title, 
+                index_str, 
+                course, 
+                section, 
+                MockPbar(), 
+                force=True
+            )
+            
+            # Construct expected path manually to report it (since _download_single constructs it locally)
+            safe_title_vid = title.replace("/", "_").replace("\\", "_")
+            filename_vid = f"{index_str}_{safe_title_vid}.mp4"
+            final_video_path = os.path.join(target_base, filename_vid)
+            
+            if success: 
+                print("   ✅ Video Downloaded")
+                print(f"   📂 Saved to: {os.path.abspath(final_video_path)}")
+            
+def insert_into_manifest(entry_data):
+    """
+    Inserts a video entry into the manifest file at the correct location.
+    entry_data: {index, title, url, course, section}
+    """
+    if not os.path.exists(MANIFEST_FILE):
+        return False
+
+    lines = []
+    with open(MANIFEST_FILE, "r", encoding="utf-8") as f:
+        lines = f.readlines()
+
+    course = entry_data['course']
+    section = entry_data['section']
+    
+    # FORMAT CORRECTION: Matches '001_Title | URL' (2 columns)
+    # Removing extra columns (Course replacement/Section) to stay compliant with file history
+    clean_title = entry_data['title'].replace("|", "-").strip()
+    # Ensure Index_Title
+    full_label = f"{entry_data['index']}_{clean_title}"
+    new_line = f"{full_label} | {entry_data['url']}\n"
+    
+    # Logic to find insertion point
+    course_found = False
+    section_found = False
+    insertion_idx = -1
+    
+    for i, line in enumerate(lines):
+        # 1. Find Course Header
+        if line.strip().startswith(f"# === {course}"):
+            course_found = True
+        
+        # 2. Find Section Header (only if course currently active or global search if simple structure)
+        if course_found or True: # Simplified structure assumption standard
+             if line.strip().startswith(f"## --- {section} ---"):
+                 section_found = True
+                 insertion_idx = i + 1 # Start looking after header
+                 
+                 # Fast forward to end of this section (before next section or course)
+                 for j in range(i + 1, len(lines)):
+                     line_s = lines[j].strip()
+                     if line_s.startswith("## ---") or line_s.startswith("# ===") or line_s.startswith("# ----------------"):
+                         insertion_idx = j
+                         break
+                     else:
+                         insertion_idx = j + 1 # Keep pushing down
+                 break
+    
+    if insertion_idx != -1:
+        lines.insert(insertion_idx, new_line)
+    else:
+        # Append if structure not found
+        lines.append(f"\n# === {course} ===\n")
+        lines.append(f"\n## --- {section} ---\n")
+        lines.append(new_line)
+        
+    try:
+        with open(MANIFEST_FILE, "w", encoding="utf-8") as f:
+            f.writelines(lines)
+        return True
+    except Exception as e:
+        print(f"Write Error: {e}")
+        return False
+
+    # ... inside process_single_url after download ...
+        if success: 
+            print("   ✅ Video Downloaded")
+            print(f"   📂 Saved to: {os.path.abspath(final_video_path)}")
+            
+            # 4. Update Manifest (Insert at correct location)
+            entry = {
+                'index': index_str,
+                'title': title,
+                'url': video_url,
+                'course': course,
+                'section': section
+            }
+            if insert_into_manifest(entry):
+                print(f"   📝 Inserted into manifest: {MANIFEST_FILE}")
+            else:
+                print(f"   ⚠️ Failed to update manifest.")
+                
+        else: print("   ❌ Video Download Failed")
+    else:
+        print("   ⚠️ No video URL found.")
+
+
 def main():
     parser = argparse.ArgumentParser(description="Modular Smart Scraper")
+    parser.add_argument("--url", help="Process a single specific URL")
     parser.add_argument("--scan", action="store_true", help="Scan site and update manifest")
     parser.add_argument("--download", action="store_true", help="Download videos from manifest")
     parser.add_argument("--archive", action="store_true", help="Archive full HTML/Assets")
@@ -304,7 +617,11 @@ def main():
     
     if args.visible: os.environ["HEADLESS_MODE"] = "false"
     
-    if args.scan:
+    if args.visible: os.environ["HEADLESS_MODE"] = "false"
+    
+    if args.url:
+        process_single_url(args.url, verbose=args.verbose)
+    elif args.scan:
         scan_videos(limit=args.limit, update_metadata=args.update_metadata, offset=args.offset, verbose=args.verbose)
     elif args.download:
         download_videos(force=args.force)

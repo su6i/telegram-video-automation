@@ -1,9 +1,10 @@
 import os
 import json
 import re
+from src import config
 
-STORAGE_DIR = ".storage"
-MEDIA_PATHS_FILE = os.path.join(STORAGE_DIR, "media_paths.json")
+STORAGE_DIR = config.get_path("base_dir")
+MEDIA_PATHS_FILE = config.get_path("media_paths_file")
 
 def normalize_title(filename):
     """

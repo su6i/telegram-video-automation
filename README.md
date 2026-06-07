@@ -22,6 +22,11 @@
 ---
 
 ## ⚡ Quick Start
+
+> **Note:** This project supports **English**, **French**, and **Persian (Farsi)**. (Localization in progress).
+
+### Option 1: Legacy Scripts (Recommended)
+
 ```bash
 ./scan.sh           # 🔍 Map structure
 ./download.sh       # 📥 Fetch media
@@ -32,6 +37,21 @@
 > **Customizing the Index (Table of Contents)**
 > If you have pre-created "Welcome" or "Placeholder" messages in your channel, you can tell the uploader to use them for the Table of Contents:
 > `./upload.sh --index-offset 123` (Where `123` is the Message ID of your first placeholder).
+
+### Option 2: Unified CLI (Advanced)
+
+```bash
+# 1. Install dependencies
+uv sync
+
+# 2. Download a Single Lesson (Interactive)
+uv run main.py "https://target-site.com/lesson-url" --visible
+
+# 3. Batch Download from Manifest
+uv run main.py --download
+```
+
+📚 **Documentation:** [CLI Usage](docs/CLI.md) | [Architecture](docs/ARCHITECTURE.md)
 
 ---
 

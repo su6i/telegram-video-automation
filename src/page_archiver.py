@@ -25,28 +25,48 @@ def get_safe_filename(url):
     return clean
 
 
-def archive_page(page_url, page_title=None):
+def archive_page(page_url, page_title=None, output_dir=None):
     """
     Archive a complete web page with all assets.
     
     Args:
         page_url: URL to archive
         page_title: Optional friendly name for the page
+        output_dir: Optional custom directory to save the archive to.
+                   If None, creates a slug in default archive dir.
     
     Returns:
         dict with archive info: {success, path, assets_count, images, links}
     """
     try:
-        os.makedirs(ARCHIVE_DIR, exist_ok=True)
-        
-        # Create folder for this page
-        safe_name = get_safe_filename(page_url)
-        page_dir = os.path.join(ARCHIVE_DIR, safe_name)
-        os.makedirs(page_dir, exist_ok=True)
+        # Determine output directory
+        if output_dir:
+            page_dir = output_dir
+            os.makedirs(page_dir, exist_ok=True)
+            safe_name = os.path.basename(output_dir) # Use dir name as key if needed
+        else:
+            os.makedirs(ARCHIVE_DIR, exist_ok=True)
+            safe_name = get_safe_filename(page_url)
+            page_dir = os.path.join(ARCHIVE_DIR, safe_name)
+            os.makedirs(page_dir, exist_ok=True)
         
         # Download main page
         print(f"📥 Downloading page: {page_url}")
-        response = requests.get(page_url, timeout=30, headers={
+        
+        # Load cookies
+        cookies = {}
+        cookie_path = "auth_cookies.json"
+        if os.path.exists(cookie_path):
+            import json
+            try:
+                with open(cookie_path, 'r') as f:
+                    c_list = json.load(f)
+                    for c in c_list:
+                        if 'name' in c and 'value' in c:
+                            cookies[c['name']] = c['value']
+            except: pass
+
+        response = requests.get(page_url, timeout=30, cookies=cookies, headers={
             'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7)'
         })
         response.raise_for_status()

@@ -58,3 +58,22 @@ logging:
   
   # Log level (DEBUG, INFO, WARNING, ERROR)
   level: INFO
+# Storage & Paths
+storage:
+  # Base directory for internal data (manifests, logs, temp)
+  base_dir: .storage
+  
+  # Directory where videos and assets are downloaded
+  downloads_dir: downloads
+  
+  # File storing the video manifest
+  manifest_file: downloaded_video.txt
+  
+  # File listing external media directories (for indexing)
+  media_paths_file: media_paths.json
+  
+  # Scraped content database
+  content_file: scraped_content.json
+  
+  # Chrome Profile Directory
+  chrome_profile_dir: chrome_profile

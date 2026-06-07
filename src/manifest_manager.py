@@ -1,6 +1,7 @@
 import os
 import shutil
 import threading
+import re
 from datetime import datetime
 
 class ManifestManager:
@@ -67,6 +68,10 @@ class ManifestManager:
         final_videos = []
         processed_urls = set()
         
+        current_course = "Unknown Course"
+        current_section = "General"
+        index_title_pattern = re.compile(r"^(\d+(?:_\d+)?)_(.*)$") # e.g. 039_1_Title
+
         def _norm_url(u):
             return u.strip().rstrip("/")
         
@@ -76,8 +81,19 @@ class ManifestManager:
                 with open(self.manifest_file, "r", encoding="utf-8") as f:
                     for line in f:
                         line = line.strip()
-                        if not line or line.startswith("# Index"): continue
+                        if not line: continue
+
+                        # Context Tracking
+                        if line.startswith("# === "):
+                            current_course = line.replace("# === ", "").replace(" ===", "").strip()
+                            current_section = "General"
+                            continue
+                        if line.startswith("## --- "):
+                            current_section = line.replace("## --- ", "").replace(" ---", "").strip()
+                            continue
                         
+                        if line.startswith("# Index"): continue # Skip header
+
                         # Preserve "Done" status
                         is_done = "# [DONE]" in line
                         clean_line = line.replace("# [DONE]", "").strip()
@@ -85,43 +101,84 @@ class ManifestManager:
                             
                         if "|" in clean_line:
                             parts = [p.strip() for p in clean_line.split("|")]
-                            if len(parts) >= 3:
-                                idx_str = parts[0]
-                                title = parts[1]
-                                url = parts[2]
-                                course = parts[3] if len(parts) > 3 else 'Unknown'
-                                section = parts[4] if len(parts) > 4 else 'General'
-                                
-                                if not url.startswith("http"): continue
-                                
-                                if idx_str.isdigit():
-                                    max_index = max(max_index, int(idx_str))
-                                
-                                norm_url = _norm_url(url)
-                                processed_urls.add(norm_url)
-                                
-                                # Default to existing
-                                vid_data = {
-                                    'index': idx_str,
-                                    'url': url,
-                                    'is_done': is_done,
-                                    'title': title,
-                                    'course_title': course,
-                                    'section': section,
-                                    'category': section,
-                                    'subsection': None
-                                }
-                                
-                                # UPGRADE with Fresh Metadata if available
-                                if norm_url in fresh_videos_map:
-                                    fresh = fresh_videos_map[norm_url]
-                                    vid_data['title'] = fresh.get('title', title)
-                                    vid_data['course_title'] = fresh.get('course_title', course)
-                                    vid_data['section'] = fresh.get('section', section)
-                                    vid_data['category'] = fresh.get('category', section)
-                                    vid_data['subsection'] = fresh.get('subsection', None)
-                                
-                                final_videos.append(vid_data)
+                            
+                            # --- Smart Parse: Find URL ---
+                            url_idx = -1
+                            for i, p in enumerate(parts):
+                                if p.startswith("http"):
+                                    url_idx = i
+                                    break
+                            
+                            if url_idx == -1: continue 
+                            
+                            url = parts[url_idx]
+                            
+                            # --- Extract Metadata ---
+                            course = current_course
+                            section = current_section
+                            if len(parts) > url_idx + 1: course = parts[url_idx+1]
+                            if len(parts) > url_idx + 2: section = parts[url_idx+2]
+                            
+                            # --- Extract Index & Title ---
+                            pre_url_parts = parts[:url_idx]
+                            idx_str = None
+                            title = "Unknown"
+                            
+                            if pre_url_parts:
+                                first = pre_url_parts[0]
+                                # Pure index check
+                                if re.match(r"^\d+(?:_\d+)?$", first) and len(pre_url_parts) > 1:
+                                    idx_str = first
+                                    title = " - ".join(pre_url_parts[1:])
+                                else:
+                                    match = index_title_pattern.match(first)
+                                    if match:
+                                        idx_str = match.group(1)
+                                        t_p = match.group(2)
+                                        if len(pre_url_parts) > 1:
+                                            title = t_p + " - " + " - ".join(pre_url_parts[1:])
+                                        else:
+                                            title = t_p
+                                    else:
+                                        # No index
+                                        idx_str = "999"
+                                        title = " - ".join(pre_url_parts)
+
+                            if url_idx != -1: # Just to keep indentation logic/vars valid
+                                pass
+                            
+                            if idx_str and idx_str.replace("_", "").isdigit():
+                                 try:
+                                     # Track max index for base numbers
+                                     base_idx = int(idx_str.split('_')[0])
+                                     max_index = max(max_index, base_idx)
+                                 except: pass
+                            
+                            norm_url = _norm_url(url)
+                            processed_urls.add(norm_url)
+                            
+                            # Default to existing
+                            vid_data = {
+                                'index': idx_str,
+                                'url': url,
+                                'is_done': is_done,
+                                'title': title,
+                                'course_title': course,
+                                'section': section,
+                                'category': section,
+                                'subsection': None
+                            }
+                            
+                            # UPGRADE with Fresh Metadata if available
+                            if norm_url in fresh_videos_map:
+                                fresh = fresh_videos_map[norm_url]
+                                vid_data['title'] = fresh.get('title', title)
+                                vid_data['course_title'] = fresh.get('course_title', course)
+                                vid_data['section'] = fresh.get('section', section)
+                                vid_data['category'] = fresh.get('category', section)
+                                vid_data['subsection'] = fresh.get('subsection', None)
+                            
+                            final_videos.append(vid_data)
             except Exception as e:
                 print(f"⚠️ Could not read existing manifest: {e}")
                 
@@ -147,25 +204,32 @@ class ManifestManager:
         final_videos.extend(new_found)
         
         # 4. SORT & Renumber Sequentially
-        # Sort key: Course -> Section -> Subsection (empty last) -> Title
+        # Sort key: Course -> Section -> Subsection (empty last) -> Index (Float-like)
         def sort_key(v):
+            idx_val = 999999.0
+            if v.get('index'):
+                try: 
+                    # Handle 039_1 as 39.1 for sorting
+                    idx_val = float(v['index'].replace("_", "."))
+                except: pass
+            
             return (
                 v.get('course_title', 'zzz'), 
                 v.get('section', 'zzz'), 
                 v.get('subsection') or '',
-                # Try to keep existing index order if possible, else title
-                int(v['index']) if v['index'] and v['index'].isdigit() else 999999
+                idx_val
             )
             
         final_videos.sort(key=sort_key)
         
-        for idx, v in enumerate(final_videos, 1):
-            v['index'] = f"{idx:03d}"
+        # Disable auto-renumbering to preserve 039_X format
+        # for idx, v in enumerate(final_videos, 1):
+        #     v['index'] = f"{idx:03d}"
         
         # 5. Write Manifest
         with self.lock:
             with open(self.manifest_file, "w", encoding="utf-8") as f:
-                f.write(f"# Index | Title | URL | Course | Section | Status\n")
+                f.write(f"# Index_Title | URL\n")
                 f.write(f"# To skip a video, delete the line or put a '#' at the start\n")
                 
                 current_course = None
@@ -199,8 +263,9 @@ class ManifestManager:
                     status_pfx = "# [DONE] " if v.get('is_done') else ""
                     clean_title = v['title'].replace("\n", " ").strip()
                     
-                    # Ensure at least 3 columns for parsing
-                    line = f"{v['index']} | {clean_title} | {v['url']} | {c_title} | {sec_name}"
+                    # 2-column format: Index_Title | URL
+                    idx_display = v['index'] if v['index'] else "999"
+                    line = f"{idx_display}_{clean_title} | {v['url']}"
                     f.write(f"{status_pfx}{line}\n")
                 
                 print(f"   ✅ Manifest saved: {len(final_videos)} entries")

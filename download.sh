@@ -1,2 +1,2 @@
 #!/bin/bash
-"$(dirname "$0")/.venv/bin/python" scripts/scraper.py --download "$@"
+uv run main.py --download "$@"

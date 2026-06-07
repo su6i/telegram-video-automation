@@ -15,10 +15,11 @@ from bs4 import BeautifulSoup
 from .base import BaseScraper
 import os
 from dotenv import load_dotenv
+from src import config
 
 load_dotenv()
 
-STORAGE_DIR = ".storage"
+STORAGE_DIR = config.get_path("base_dir")
 STRUCTURE_FILE = os.path.join(STORAGE_DIR, "course_structure.json")
 
 class FatalScraperError(Exception):
@@ -91,7 +92,7 @@ class PrimaryScraper(BaseScraper):
             chrome_options.add_argument("--window-size=1920,1080")
             
             # USE PERSISTENT PROFILE
-            profile_path = os.path.abspath(os.path.join(STORAGE_DIR, "chrome_profile"))
+            profile_path = os.path.abspath(config.get_path("chrome_profile_dir"))
             os.makedirs(profile_path, exist_ok=True)
             chrome_options.add_argument(f"--user-data-dir={profile_path}")
             
@@ -423,6 +424,103 @@ class PrimaryScraper(BaseScraper):
                  return urljoin(current_url, a['href'])
         return None
 
+    # --- SINGLE URL MODE ---
+    def get_lesson_details(self, url):
+        """Fetches a single lesson and attempts to extract full hierarchy metadata."""
+        print(f"🔍 Analyzing Single URL: {url}")
+        driver = self._get_driver()
+        
+        # 1. Navigate
+        try:
+            driver.get(url)
+            time.sleep(3) # Wait for JS load
+        except Exception as e:
+            raise FatalScraperError(f"Failed to load URL: {e}")
+        
+        # 2. Extract Basic Content (Title, Video URL, Description)
+        # We assume _extract_lesson_content works mainly on current page state
+        data = self._extract_lesson_content(driver, url)
+        
+        # 3. Intelligent Hierarchy Extraction (Course > Section)
+        # We need this to determine where to save the file
+        soup = BeautifulSoup(driver.page_source, "html.parser")
+        
+        course_title = "Unknown Course"
+        section_title = "General"
+        
+        # Strategy A: Breadcrumbs (Common in these platforms)
+        # Look for typical breadcrumb structures
+        breadcrumbs = soup.select("nav[aria-label='breadcrumb'] li, .breadcrumbs li, .breadcrumb-item")
+        if breadcrumbs:
+            texts = [b.get_text(strip=True) for b in breadcrumbs]
+            # Valid breadcrumb usually: Home > Course Name > Section > Lesson
+            # Or: Course Name > Section
+            clean_texts = [t for t in texts if t not in ["Home", "Library", ">", "/"]]
+            
+            if len(clean_texts) >= 1:
+                 course_title = clean_texts[0]
+            if len(clean_texts) >= 2:
+                 section_title = clean_texts[1]
+                 
+        # Strategy B: Sidebar / Product Outline
+        # Try to find the 'active' lesson in the sidebar and look up to find the section header
+        if section_title == "General":
+            # Finding the active link in the sidebar
+            active_node = soup.select_one(".product-outline-post.active, .sidebar .active, .lesson-item.active")
+            if active_node:
+                # Search backwards for a Section Header
+                # Usually a div with class 'product-outline-category' or similar
+                section_header = active_node.find_previous(class_=lambda c: c and any(x in str(c) for x in ["category-title", "section-title", "outline-category"]))
+                if section_header:
+                    header_text = section_header.select_one(".product-outline-category__title, h4, h5")
+                    if header_text:
+                        section_title = header_text.get_text(strip=True)
+                    else:
+                        section_title = section_header.get_text(strip=True)
+
+        # Strategy B2: Panel Sub-Title (Confirmed by Browser Method)
+        if section_title == "General":
+            # Common in Kajabi themes: h5.panel__sub-title > a
+            sub_title_link = soup.select_one("h5.panel__sub-title a, .panel__sub-title a, h5 a[href*='/categories/']")
+            if sub_title_link:
+                section_title = sub_title_link.get_text(strip=True)
+            else:
+                 # Direct Category Link anywhere near top
+                 cat_link = soup.select_one("a[href*='/categories/']")
+                 if cat_link:
+                     section_title = cat_link.get_text(strip=True)
+
+        # Strategy C: Page Title Fallback for Course
+        if course_title == "Unknown Course":
+             # 1. Product Link (Robust Kajabi Selector)
+             # e.g. <a href='/products/ai-creator-course'>AI Creator Course</a>
+             prod_link = soup.select_one("a[href^='/products/']:not([href*='/categories/']):not([href*='/posts/'])")
+             if prod_link:
+                 course_title = prod_link.get_text(strip=True)
+             else:
+                 # 2. Class-based fallback
+                 c_title_tag = soup.select_one(".product-title, .course-title, .navbar-brand")
+                 if c_title_tag:
+                     course_title = c_title_tag.get_text(strip=True)
+                 
+        # Strategy D: URL Regex Fallback (Very reliable for this site)
+        if course_title == "Unknown Course":
+            import re
+            # Extract from /products/ai-creator-course/...
+            match = re.search(r'/products/([^/]+)', url)
+            if match:
+                slug = match.group(1)
+                course_title = slug.replace("-", " ").title()
+                # Specific Mapping
+                if slug == "ai-creator-course":
+                    course_title = "AI Creator Course"
+
+        data['course_title'] = course_title
+        data['section'] = section_title
+        
+        print(f"   📍 Context: {course_title} > {section_title}")
+        return data
+
     # --- PHASE 2: CONTENT EXTRACTION ---
     def scan_content(self, limit=None, offset=0, callback=None):
         """PHASE 2: Hydrates the structure by visiting lesson URLs."""
@@ -546,7 +644,17 @@ class PrimaryScraper(BaseScraper):
         
         # Title Logic
         final_title = default_title or "Unknown Title"
-        if not default_title:
+        
+        # Priority 1: Specific Lesson Title Element
+        title_el = soup.select_one(".post-title, .product-outline-post__title, h1.title, .lesson_title")
+        if title_el:
+             final_title = title_el.get_text(strip=True)
+        # Priority 2: Generic H1 if mostly unique
+        elif not default_title:
+             h1 = soup.find("h1")
+             if h1: final_title = h1.get_text(strip=True)
+        # Priority 3: Meta Title Fallback
+        elif not default_title:
              final_title = driver.title.split("|")[0].strip()
         
         # Extract Content Body (Simplified for this file re-write, but core logic preserved)
