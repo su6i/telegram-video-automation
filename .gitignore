@@ -1,0 +1,50 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+env/
+venv/
+.venv/
+pip-log.txt
+pip-delete-this-directory.txt
+
+# Telegram Sessions & Credentials
+*.session
+*.session-journal
+.env
+auth_cookies.json
+content_creator_cookies.json
+
+# Tool Specific
+.storage/
+processed/
+scraped_content.json
+downloaded_video.txt
+temp_*/
+*.log
+*.tmp
+debug_*.html
+
+# OS
+.DS_Store
+Thumbs.db
+prompts/gen_*.txt
+prompts/task_*.txt
+TODO.md
+.agent/constitution
+SESSION.md
+
+# --- rule 035: scraped/channel data never lives in the repo ---
+backup_captions.json
+scraped_content.json
+course_structure.json
+*_cookies.json
+site_profile.json
+
+# runtime artefacts, not source
+failed_downloads.txt
+
+# media blobs live in the vault, not in git (rule 035)
+demo/demo_recording.webp

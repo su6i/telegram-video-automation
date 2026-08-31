@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Terminal Demo - Telegram Video Automation</title>
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            background: #1a1a2e;
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-family: 'JetBrains Mono', monospace;
+        }
+        .terminal {
+            width: 900px;
+            background: #0d0d0d;
+            border-radius: 12px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.5);
+            overflow: hidden;
+        }
+        .terminal-header {
+            background: linear-gradient(135deg, #2d2d2d 0%, #1f1f1f 100%);
+            padding: 12px 16px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .btn { width: 14px; height: 14px; border-radius: 50%; }
+        .btn-red { background: #ff5f57; }
+        .btn-yellow { background: #febc2e; }
+        .btn-green { background: #28c840; }
+        .terminal-title {
+            color: #888;
+            font-size: 13px;
+            margin-left: 8px;
+        }
+        .terminal-body {
+            padding: 20px;
+            color: #e0e0e0;
+            font-size: 14px;
+            line-height: 1.6;
+            height: 500px;
+            overflow-y: auto;
+        }
+        .prompt { color: #50fa7b; }
+        .command { color: #8be9fd; font-weight: bold; }
+        .success { color: #50fa7b; }
+        .info { color: #bd93f9; }
+        .warning { color: #ffb86c; }
+        .highlight { color: #ff79c6; }
+        .line { opacity: 0; animation: fadeIn 0.3s forwards; }
+        @keyframes fadeIn { to { opacity: 1; } }
+        .cursor {
+            display: inline-block;
+            width: 10px;
+            height: 18px;
+            background: #50fa7b;
+            animation: blink 1s infinite;
+            vertical-align: middle;
+        }
+        @keyframes blink { 50% { opacity: 0; } }
+    </style>
+</head>
+<body>
+    <div class="terminal">
+        <div class="terminal-header">
+            <div class="btn btn-red"></div>
+            <div class="btn btn-yellow"></div>
+            <div class="btn btn-green"></div>
+            <span class="terminal-title">telegram-video-automation — zsh</span>
+        </div>
+        <div class="terminal-body" id="output"></div>
+    </div>
+
+    <script>
+        const lines = [
+            { text: '<span class="prompt">$</span> <span class="command">./scan.sh</span>', delay: 500 },
+            { text: '🔍 Scanning: https://example-course.com/python-basics', delay: 800 },
+            { text: '<span class="info">📚 Found Course: Python Fundamentals 2024</span>', delay: 600 },
+            { text: '   └─ Module 1: Getting Started (5 videos)', delay: 400 },
+            { text: '   └─ Module 2: Data Types (8 videos)', delay: 400 },
+            { text: '   └─ Module 3: Control Flow (6 videos)', delay: 400 },
+            { text: '   └─ Module 4: Functions (7 videos)', delay: 400 },
+            { text: '<span class="success">✅ Scan complete: 26 videos mapped to manifest</span>', delay: 800 },
+            { text: '', delay: 500 },
+            
+            { text: '<span class="prompt">$</span> <span class="command">./download.sh</span>', delay: 800 },
+            { text: '📥 Starting download pipeline...', delay: 600 },
+            { text: '<span class="info">⚡ Hardware acceleration: Apple VideoToolbox detected</span>', delay: 500 },
+            { text: '', delay: 300 },
+            { text: '[1/26] 📥 001_Introduction.mp4 <span class="success">[████████████████] 100%</span>', delay: 700 },
+            { text: '[2/26] 📥 002_Installing_Python.mp4 <span class="success">[████████████████] 100%</span>', delay: 600 },
+            { text: '[3/26] 📥 003_Your_First_Program.mp4 <span class="success">[████████████████] 100%</span>', delay: 600 },
+            { text: '...', delay: 400 },
+            { text: '[26/26] 📥 026_Final_Project.mp4 <span class="success">[████████████████] 100%</span>', delay: 700 },
+            { text: '<span class="success">✅ Download complete: 26 videos (4.2GB total)</span>', delay: 800 },
+            { text: '', delay: 500 },
+            
+            { text: '<span class="prompt">$</span> <span class="command">./upload.sh --intro</span>', delay: 800 },
+            { text: '🚀 Starting upload pipeline...', delay: 600 },
+            { text: '<span class="info">📊 Profile: 720p HD | Intro: Enabled</span>', delay: 500 },
+            { text: '', delay: 300 },
+            { text: '[1/26] 🎬 Processing: "Introduction to Python"', delay: 600 },
+            { text: '   <span class="info">⚡ No intro - using fast stream copy...</span>', delay: 500 },
+            { text: '   📤 Uploading to @PythonCourse... <span class="success">[100%]</span>', delay: 800 },
+            { text: '   <span class="success">✅ Success - Message ID: #1001</span>', delay: 400 },
+            { text: '', delay: 300 },
+            { text: '[2/26] 🎬 Processing: "Installing Python"', delay: 600 },
+            { text: '   <span class="info">⚡ No intro - using fast stream copy...</span>', delay: 500 },
+            { text: '   📤 Uploading to @PythonCourse... <span class="success">[100%]</span>', delay: 800 },
+            { text: '   <span class="success">✅ Success - Message ID: #1002</span>', delay: 400 },
+            { text: '', delay: 300 },
+            { text: '...', delay: 500 },
+            { text: '', delay: 300 },
+            { text: '<span class="highlight">✨ Upload complete: 26 videos published!</span>', delay: 700 },
+            { text: '<span class="info">📝 Updating Table of Contents...</span> <span class="success">[DONE]</span>', delay: 600 },
+            { text: '', delay: 500 },
+            { text: '<span class="success">🎉 All done! Your course is now live on Telegram.</span>', delay: 500 },
+        ];
+
+        const output = document.getElementById('output');
+        let lineIndex = 0;
+        let totalDelay = 0;
+
+        lines.forEach((line, i) => {
+            totalDelay += line.delay;
+            setTimeout(() => {
+                const div = document.createElement('div');
+                div.className = 'line';
+                div.innerHTML = line.text || '&nbsp;';
+                div.style.animationDelay = '0s';
+                output.appendChild(div);
+                output.scrollTop = output.scrollHeight;
+            }, totalDelay);
+        });
+
+        // Add blinking cursor at the end
+        setTimeout(() => {
+            const cursor = document.createElement('div');
+            cursor.innerHTML = '<span class="prompt">$</span> <span class="cursor"></span>';
+            output.appendChild(cursor);
+        }, totalDelay + 500);
+    </script>
+</body>
+</html>
