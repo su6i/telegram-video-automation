@@ -3,6 +3,15 @@
 ## Unreleased
 
 ### Fixed
+- Two of T-933's F821 (undefined-name) findings fixed: `scripts/replace_video.py`
+  was calling `re.split()` without `import re`. `scripts/process_and_upload.py`
+  caught `AuthPasswordInvalid`, a name that doesn't exist anywhere in `pyrogram`
+  — the real exception pyrogram raises for a wrong 2FA password is
+  `PasswordHashInvalid` (`BadRequest` subclass, matches Telegram's
+  `PASSWORD_HASH_INVALID` RPC error), confirmed by inspecting the installed
+  `pyrogram.errors` module. The other 16 F821 findings (`scripts/scraper.py`,
+  `scripts/retry_failed_uploads.py`) need a human read of intended behavior
+  first — see `WO-TVA-0005`. (T-934)
 - `tests/test_preview_gen.py` was a module-level script with no `def test_...()`
   function, so it ran at pytest **collection** time on every test run, wrote a
   tracked binary (`title_preview.png`) into the repo root as a side effect, and
