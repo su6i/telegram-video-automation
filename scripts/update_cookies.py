@@ -1,15 +1,15 @@
 import json
-import time
 import os
-import sys
-from selenium import webdriver
-from selenium.webdriver.chrome.service import Service
-from webdriver_manager.chrome import ChromeDriverManager
-from selenium.webdriver.chrome.options import Options
 
 # Load environment to get base URL
 from dotenv import load_dotenv
+from selenium import webdriver
+from selenium.webdriver.chrome.options import Options
+from selenium.webdriver.chrome.service import Service
+from webdriver_manager.chrome import ChromeDriverManager
+
 from src.env_resolver import env_path
+
 load_dotenv(env_path())
 
 TARGET_URL = os.getenv("TARGET_SITE_BASE_URL", "https://example.com") + "/login"

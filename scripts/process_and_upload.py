@@ -1,51 +1,45 @@
+import argparse
+import asyncio
+import getpass
+import json
+import logging
 import os
+import re
 import subprocess
 import sys
-import asyncio
-import json
-import re
-import math
-import argparse
-import getpass
-import logging
-from pathlib import Path
-from datetime import datetime
+
 from dotenv import load_dotenv
+
 from src.env_resolver import env_path
 
 # Progress bar removed to restore detailed output
 HAS_TQDM = False
 tqdm = None
 
-from telegram import Bot
-from telegram.error import TelegramError
 from pyrogram import Client
-from pyrogram.types import Message
-from pyrogram.errors import PasswordHashInvalid, SessionPasswordNeeded, PhoneCodeInvalid
+from pyrogram.errors import SessionPasswordNeeded
+from telegram import Bot
 
 # Add project root to sys.path
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 # Import Shared Modules
-from src.video_utils import (
-    process_video_for_user_safe as process_video_for_user,
-    split_video_for_bot_safe as split_video_for_bot,
-    split_video_for_user_safe as split_video_for_user,
-    get_smart_title,
-    extract_thumbnail,
-    is_video_valid,
-    SIZE_THRESHOLD_MB,
-    BOT_MAX_SIZE_MB,
-    USER_MAX_SIZE_MB
-)
+from src.caption_builder import build_caption, validate_caption
+from src.manifest_tracker import get_all_manifest_videos, update_manifest_status
+from src.media_resolver import list_all_videos
 from src.telegram_utils import (
+    decide_upload_method,
     upload_with_bot,
     upload_with_user_account,
-    decide_upload_method
 )
-from src.media_resolver import list_all_videos, find_video_file
-from src.manifest_tracker import update_manifest_status, get_pending_videos, get_all_manifest_videos
-from src.caption_builder import build_caption, validate_caption
+from src.video_utils import (
+    USER_MAX_SIZE_MB,
+    extract_thumbnail,
+    get_smart_title,
+    is_video_valid,
+)
+from src.video_utils import process_video_for_user_safe as process_video_for_user
+from src.video_utils import split_video_for_user_safe as split_video_for_user
 
 # Load environment variables
 root_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -450,7 +444,7 @@ async def main():
                 bot_available = False # Disable bot for this run
         
         # 1. Scan available physical files once
-        print(f"🔍 Scanning all media paths...")
+        print("🔍 Scanning all media paths...")
         physical_videos = {} # Map index -> (filename, full_path)
         
         for filename, full_path in list_all_videos():
@@ -525,8 +519,8 @@ async def main():
                 print(f"{'!'*60}")
                 print(f"❌ Error: File for next video ({idx}) not found!")
                 print(f"   Title: {m_video['title']}")
-                print(f"   ⚠️ Possible cause: The drive containing this file is not connected.")
-                print(f"   ⚠️ Program halted to maintain sequence in Telegram.")
+                print("   ⚠️ Possible cause: The drive containing this file is not connected.")
+                print("   ⚠️ Program halted to maintain sequence in Telegram.")
                 print(f"{'!'*60}\n")
                 return # HALT
 
@@ -559,7 +553,7 @@ async def main():
             print(f"{'='*60}")
             
             if not os.path.exists(input_path):
-                print(f"❌ Input file not found")
+                print("❌ Input file not found")
                 failed_count += 1
                 continue
             
@@ -594,7 +588,7 @@ async def main():
                     print(f"🎯 Selected method (Existing): {'Bot' if upload_method == 'bot' else 'User Account'}")
 
             if processing_needed:
-                print(f"🔄 Processing and Compressing to 720p...")
+                print("🔄 Processing and Compressing to 720p...")
                 
                 # Step 1: Always process & compress first
                 success = await process_video_for_user(input_path, output_path, title, add_intro=args.intro, target_res=args.res)
@@ -624,7 +618,7 @@ async def main():
                     continue
             
             if not processed_files:
-                print(f"❌ Error in file processing")
+                print("❌ Error in file processing")
                 failed_count += 1
                 continue
                 
@@ -639,7 +633,7 @@ async def main():
                 
                 if not has_thumb:
                     print(f"❌ CRITICAL Error: Mandatory thumbnail extraction failed for {idx}.")
-                    print(f"   Skipping this video to maintain professional quality.")
+                    print("   Skipping this video to maintain professional quality.")
                     failed_count += 1
                     continue
 
@@ -652,7 +646,7 @@ async def main():
                      if msg:
                          if not first_msg: first_msg = msg
                          processed_count += 1
-                         print(f"🎉 User account upload successful!")
+                         print("🎉 User account upload successful!")
                          # Save History & Update Manifest
                          idx = get_index_from_filename(filename)
                          save_upload_history(idx, title, msg, False)
@@ -672,7 +666,7 @@ async def main():
                      if msg:
                          if not first_msg: first_msg = msg
                          processed_count += 1
-                         print(f"🎉 Bot upload successful!")
+                         print("🎉 Bot upload successful!")
                          # Save History & Update Manifest
                          if j == 0:  # Only update for first part
                             idx = get_index_from_filename(filename)
@@ -726,7 +720,7 @@ async def main():
                 await asyncio.sleep(delay)
         
         print(f"{'='*60}")
-        print(f"📊 Summary:")
+        print("📊 Summary:")
         print(f"   📁 Total: {total_files}")
         print(f"   ✅ Successful: {processed_count}")
         print(f"   ❌ Failed: {failed_count}")
@@ -754,10 +748,10 @@ async def main():
         print("\n⚠️ Stopped by Ctrl+C")
     except Exception as e:
         if "database disk image is malformed" in str(e).lower():
-            print(f"❌ CRITICAL ERROR: Telegram session database is corrupted.")
-            print(f"👉 Fix: Run 'rm scripts/hybrid_account.session' and try again.")
+            print("❌ CRITICAL ERROR: Telegram session database is corrupted.")
+            print("👉 Fix: Run 'rm scripts/hybrid_account.session' and try again.")
         else:
-            print(f"❌ Unexpected Error: {str(e)}")
+            print(f"❌ Unexpected Error: {e!s}")
     finally:
         try:
             if 'app' in locals() and app.is_connected:

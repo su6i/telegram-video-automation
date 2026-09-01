@@ -1,7 +1,6 @@
 
 import os
 import subprocess
-import json
 
 STORAGE_DIR = ".storage"
 TEMP_VIDEO_DIR = os.path.join(STORAGE_DIR, "temp_video")

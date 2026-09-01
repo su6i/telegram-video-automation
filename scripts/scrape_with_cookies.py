@@ -4,9 +4,10 @@ Scrape course structure using saved session/cookies
 """
 
 import json
+
 import requests
 from bs4 import BeautifulSoup
-import time
+
 
 def scrape_with_cookies(url, cookies_file):
     """
@@ -46,7 +47,7 @@ def scrape_with_cookies(url, cookies_file):
             print(f"❌ Status code: {response.status_code}")
             return None
         
-        print(f"✅ Page loaded (status 200)")
+        print("✅ Page loaded (status 200)")
         
         # Parse HTML
         soup = BeautifulSoup(response.content, 'html.parser')

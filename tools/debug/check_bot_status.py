@@ -1,7 +1,9 @@
-import os
 import asyncio
-from pyrogram import Client
+import os
+
 from dotenv import load_dotenv
+from pyrogram import Client
+
 from src.env_resolver import env_path
 
 load_dotenv(env_path())
@@ -25,7 +27,7 @@ async def check_bot_access():
             print("\u274c CHANNEL_ID missing in .env")
             return
         digits = raw.lstrip("-")
-        bare = digits[3:] if digits.startswith("100") else digits
+        bare = digits.removeprefix("100")
         channel_ids = [f"-{digits}", f"-{bare}", digits, bare]
         
         for channel_id in channel_ids:
@@ -40,7 +42,7 @@ async def check_bot_access():
                     member = await app.get_chat_member(int(channel_id), "me")
                     print(f"🔑 Bot Status: {member.status}")
                 except Exception as e:
-                    print(f"⚠️ Membership check error: {str(e)}")
+                    print(f"⚠️ Membership check error: {e!s}")
                 
                 # Test fetching messages
                 try:
@@ -51,13 +53,13 @@ async def check_bot_access():
                             print(f"📹 Video found: {message.caption[:50] if message.caption else 'No caption'}...")
                     print(f"📊 Messages checked: {message_count}")
                 except Exception as e:
-                    print(f"❌ Error fetching messages: {str(e)}")
+                    print(f"❌ Error fetching messages: {e!s}")
                     
             except Exception as e:
-                print(f"❌ Error: {str(e)}")
+                print(f"❌ Error: {e!s}")
         
         # Test with username if available
-        print(f"\n📝 If you have channel username, enter it here (or press Enter to skip):")
+        print("\n📝 If you have channel username, enter it here (or press Enter to skip):")
         username = input("Channel Username (e.g. @mychannel): ").strip()
         
         if username:
@@ -65,10 +67,10 @@ async def check_bot_access():
                 chat_info = await app.get_chat(username)
                 print(f"✅ Channel with username: {chat_info.title} - ID: {chat_info.id}")
             except Exception as e:
-                print(f"❌ Error with username: {str(e)}")
+                print(f"❌ Error with username: {e!s}")
         
     except Exception as e:
-        print(f"❌ General Error: {str(e)}")
+        print(f"❌ General Error: {e!s}")
     finally:
         await app.stop()
 

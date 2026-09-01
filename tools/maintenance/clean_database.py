@@ -91,7 +91,7 @@ def clean():
         if title != original_title or desc != original_desc:
             cleaned_count += 1
 
-    print(f"✨ Cleaning Summary:")
+    print("✨ Cleaning Summary:")
     print(f"   - Total Entries: {len(data)}")
     print(f"   - Titles Fixed: {title_fixes}")
     print(f"   - Descriptions Fixed: {desc_fixes}")

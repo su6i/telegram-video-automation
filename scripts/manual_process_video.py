@@ -1,8 +1,10 @@
-import os
 import asyncio
+import os
+
 from dotenv import load_dotenv
+
 from src.env_resolver import env_path
-from src.video_utils import process_video_for_user_safe, get_smart_title
+from src.video_utils import get_smart_title, process_video_for_user_safe
 
 load_dotenv(env_path())
 # Config
@@ -40,7 +42,7 @@ async def manual_process():
     success = await process_video_for_user_safe(input_path, output_path, title)
     
     if success:
-        print(f"✅ Final video created successfully.")
+        print("✅ Final video created successfully.")
         print(f"📍 File path: {output_path}")
         print("This file is now ready for upload.")
     else:

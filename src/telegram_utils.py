@@ -1,8 +1,9 @@
-import os
 import asyncio
+import os
+
+from pyrogram import enums
 from telegram import Bot
 from telegram.error import TelegramError
-from pyrogram import Client, enums
 
 # Thresholds
 SIZE_THRESHOLD_MB = 45
@@ -46,11 +47,11 @@ async def upload_with_bot(video_path, caption, token, channel_id, thumb=None, ma
             return message
             
         except TelegramError as e:
-            print(f"   ❌ Bot upload error (attempt {attempt + 1}): {str(e)}")
+            print(f"   ❌ Bot upload error (attempt {attempt + 1}): {e!s}")
             if attempt < max_retries - 1:
                 await asyncio.sleep(15 * (attempt + 1))
         except Exception as e:
-            print(f"   ❌ Unexpected error: {str(e)}")
+            print(f"   ❌ Unexpected error: {e!s}")
             if attempt < max_retries - 1:
                 await asyncio.sleep(15 * (attempt + 1))
     
@@ -89,7 +90,7 @@ async def upload_with_user_account(app, video_path, caption, channel_username, t
         return message
         
     except Exception as e:
-        print(f"   ❌ User account upload error: {str(e)}")
+        print(f"   ❌ User account upload error: {e!s}")
         return None
 
 def decide_upload_method(file_size_mb):

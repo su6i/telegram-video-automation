@@ -1,11 +1,13 @@
 
-import os
 import json
+import os
 import sys
+
 from selenium import webdriver
 from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.chrome.service import Service
 from webdriver_manager.chrome import ChromeDriverManager
+
 from src.scrapers.primary_scraper import PrimaryScraper
 
 # Video 6 URL (Craft Better PROMPTS)
@@ -46,7 +48,7 @@ def main():
             try:
                 driver.add_cookie(cookie)
                 added_count += 1
-            except Exception as e:
+            except Exception:
                 # Retry without domain
                 try:
                     old_domain = cookie.pop('domain', None)

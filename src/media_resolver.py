@@ -1,10 +1,8 @@
 """
 Media path resolver — handle multiple video directories across different drives.
 """
-import os
 import json
-from pathlib import Path
-
+import os
 
 STORAGE_DIR = ".storage"
 MEDIA_PATHS_FILE = os.path.join(STORAGE_DIR, "media_paths.json")

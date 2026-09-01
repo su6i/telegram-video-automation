@@ -1,18 +1,22 @@
+import argparse
+import asyncio
 import os
 import sys
-import asyncio
-import argparse
+
+from dotenv import load_dotenv
 from pyrogram import Client, enums
 from pyrogram.types import InputMediaVideo
-from dotenv import load_dotenv
+
 from src.env_resolver import env_path
 
 # Add project root to path
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import json
-from src.media_resolver import find_video_file, list_all_videos
-from src.video_utils import process_video_for_user_safe as process_video_for_user, get_smart_title
+
+from src.media_resolver import list_all_videos
+from src.video_utils import get_smart_title
+from src.video_utils import process_video_for_user_safe as process_video_for_user
 
 # -- Helper Functions (Copied from process_and_upload to avoid import side-effects) --
 STORAGE_DIR = ".storage"
@@ -106,7 +110,7 @@ async def main():
     args = parser.parse_args()
     
     # 1. Init Client
-    print(f"🔌 Connecting to Telegram session in 'scripts/'...")
+    print("🔌 Connecting to Telegram session in 'scripts/'...")
     app = Client("hybrid_account", api_id=API_ID, api_hash=API_HASH, workdir="scripts")
     await app.start()
     

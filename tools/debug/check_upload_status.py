@@ -8,9 +8,9 @@ import sys
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from src.manifest_tracker import (
+    get_failed_videos,
     get_pending_videos,
     get_uploaded_videos,
-    get_failed_videos
 )
 
 

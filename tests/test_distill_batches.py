@@ -4,7 +4,7 @@ from pathlib import Path
 
 sys.path.append(str(Path(__file__).resolve().parents[1] / "tools" / "knowledge"))
 
-from distill_batches import (  # noqa: E402
+from distill_batches import (
     DEFAULT_SKIP,
     group_sections,
     slugify,

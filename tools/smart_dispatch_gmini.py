@@ -1,8 +1,6 @@
-import os
 import json
-import hashlib
-from typing import Optional, Dict, Any, List
-from datetime import datetime
+import os
+from typing import Any
 
 try:
     from google import genai
@@ -28,7 +26,7 @@ class SmartAgent:
     IGNORE_DIRS = {'.git', '.storage', '__pycache__', 'venv', '.ipynb_checkpoints'}
     IGNORE_EXTS = {'.pyc', '.exe', '.png', '.jpg', '.zip'}
 
-    def __init__(self, api_key: Optional[str] = None):
+    def __init__(self, api_key: str | None = None):
         self.api_key = api_key or os.getenv("GEMINI_API_KEY")
         self.client = genai.Client(api_key=self.api_key)
         self.storage_dir = ".storage/ai_cache"
@@ -65,7 +63,7 @@ class SmartAgent:
         
         return "\n\n".join(project_context)
 
-    def run_task(self, prompt: str, context: Optional[Dict[str, Any]] = None) -> str:
+    def run_task(self, prompt: str, context: dict[str, Any] | None = None) -> str:
         roadmap = self._load_roadmap()
         
         # ۱. فاز تشخیص خودکار (استراتژیک)
@@ -97,7 +95,7 @@ class SmartAgent:
         # ۲. فاز اجرایی (Executive)
         return self._execute_with_escalation(prompt, context)
 
-    def _execute_with_escalation(self, prompt: str, context: Optional[Dict[str, Any]]) -> str:
+    def _execute_with_escalation(self, prompt: str, context: dict[str, Any] | None) -> str:
         full_prompt = f"{prompt}\nContext: {json.dumps(context)}" if context else prompt
         sys_instr = f"Follow the project roadmap strictly:\n{self.project_roadmap}"
 

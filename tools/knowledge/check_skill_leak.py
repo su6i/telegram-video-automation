@@ -64,7 +64,7 @@ def ngrams(tokens, n):
 
 def strip_markdown(text):
     """Drop fenced code and inline code, which carry no source expression."""
-    text = re.sub(r"```.*?```", " ", text, flags=re.S)
+    text = re.sub(r"```.*?```", " ", text, flags=re.DOTALL)
     return re.sub(r"`[^`]*`", " ", text)
 
 
@@ -107,9 +107,7 @@ def build_banned(terms, extra_path=None):
         if not norm:
             continue
         toks = norm.split()
-        if len(toks) > 1:
-            phrases.add(norm)
-        elif len(norm) >= MIN_TERM_LEN and norm not in STOPWORDS:
+        if len(toks) > 1 or len(norm) >= MIN_TERM_LEN and norm not in STOPWORDS:
             phrases.add(norm)
     if extra_path and os.path.exists(extra_path):
         for line in open(extra_path, encoding="utf-8"):

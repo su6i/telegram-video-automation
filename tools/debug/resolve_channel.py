@@ -1,9 +1,11 @@
+import asyncio
 import os
 import sys
-import asyncio
+
 from dotenv import load_dotenv
-from src.env_resolver import env_path
 from pyrogram import Client
+
+from src.env_resolver import env_path
 
 # Load env to get API credentials
 load_dotenv(env_path())

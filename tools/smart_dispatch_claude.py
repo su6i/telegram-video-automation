@@ -15,12 +15,11 @@ Usage:
     result = agent.run_task("Summarize this text...")
 """
 
-import os
-import json
 import hashlib
-from functools import lru_cache
-from typing import Optional, Dict, Any
+import json
+import os
 from datetime import datetime
+from typing import Any
 
 try:
     from google import genai
@@ -54,7 +53,7 @@ class SmartAgent:
     # Cache directory
     CACHE_DIR = ".storage/ai_cache"
     
-    def __init__(self, api_key: Optional[str] = None):
+    def __init__(self, api_key: str | None = None):
         """
         Initialize the Smart Agent.
         
@@ -80,7 +79,7 @@ class SmartAgent:
         content = f"{model}:{prompt}"
         return hashlib.md5(content.encode()).hexdigest()
     
-    def _get_cached_response(self, prompt: str, model: str) -> Optional[str]:
+    def _get_cached_response(self, prompt: str, model: str) -> str | None:
         """Check if response is cached."""
         cache_key = self._get_cache_key(prompt, model)
         cache_file = os.path.join(self.CACHE_DIR, f"{cache_key}.json")
@@ -89,7 +88,7 @@ class SmartAgent:
             try:
                 with open(cache_file, 'r', encoding='utf-8') as f:
                     cached = json.load(f)
-                    print(f"   💾 Cache hit! Saved API call.")
+                    print("   💾 Cache hit! Saved API call.")
                     return cached.get("response")
             except Exception:
                 pass
@@ -114,11 +113,11 @@ class SmartAgent:
     def run_task(
         self, 
         prompt: str, 
-        context: Optional[Dict[str, Any]] = None,
+        context: dict[str, Any] | None = None,
         max_tokens: int = 1000,
         temperature: float = 0.1,
         use_cache: bool = True,
-        force_model: Optional[str] = None
+        force_model: str | None = None
     ) -> str:
         """
         Run a task with automatic model escalation.
@@ -173,14 +172,14 @@ class SmartAgent:
                 
                 # Check for failure indicators
                 if "ERROR" in result_text or "I cannot" in result_text:
-                    print(f"   ⚠️ Model response indicates failure, trying next model...")
+                    print("   ⚠️ Model response indicates failure, trying next model...")
                     continue
                 
                 # Cache successful response
                 if use_cache:
                     self._cache_response(full_prompt, model_name, result_text)
                 
-                print(f"   ✅ Task completed successfully")
+                print("   ✅ Task completed successfully")
                 return result_text
                 
             except Exception as e:
@@ -189,7 +188,7 @@ class SmartAgent:
         
         return "❌ All models exhausted or failed."
     
-    def get_usage_stats(self) -> Dict[str, int]:
+    def get_usage_stats(self) -> dict[str, int]:
         """Get token usage statistics."""
         return self.token_usage.copy()
     

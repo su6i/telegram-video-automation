@@ -1,23 +1,23 @@
-import os
-import sys
 import argparse
 import concurrent.futures
-from tqdm import tqdm
-import yt_dlp
 import json
+import os
 import re
+import sys
+
+import yt_dlp
+from tqdm import tqdm
 
 # Add project root to sys.path
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 # from src.scrapers.primary_scraper import PrimaryScraper, FatalScraperError 
 # Moved to inside scan_videos to prevent startup hang
-from src.page_archiver import archive_page
-from src.media_library import MediaLibrary
 # from src.manifest_manager import ManifestManager # Can't use global import if it needs dynamic paths? 
 # Actually we can pass paths to ManifestManager
-
 from src import config
+from src.media_library import MediaLibrary
+from src.page_archiver import archive_page
 
 # Dynamic Configuration
 STORAGE_DIR = config.get_path("base_dir")
@@ -28,6 +28,7 @@ FAILED_LOG = config.get_path("failed_log")
 
 # Initialize Manager (Import after config load)
 from src.manifest_manager import ManifestManager
+
 manifest_mgr = ManifestManager(storage_dir=STORAGE_DIR, manifest_filename=os.path.basename(MANIFEST_FILE))
 
 def scan_videos(limit=None, update_metadata=False, offset=0, verbose=False):
@@ -35,7 +36,7 @@ def scan_videos(limit=None, update_metadata=False, offset=0, verbose=False):
     
     # Lazy Import to prevent startup hang
     try:
-        from src.scrapers.primary_scraper import PrimaryScraper, FatalScraperError
+        from src.scrapers.primary_scraper import FatalScraperError, PrimaryScraper
     except ImportError as e:
         print(f"❌ Failed to import Scraper: {e}")
         return
@@ -110,8 +111,8 @@ def scan_videos(limit=None, update_metadata=False, offset=0, verbose=False):
     print("\n" + "="*50)
     print(f"📄  Manifest File: {os.path.abspath(MANIFEST_FILE)}")
     print("="*50)
-    print(f"👉 Next Step: Review the manifest file, then run:")
-    print(f"   ./download.sh")
+    print("👉 Next Step: Review the manifest file, then run:")
+    print("   ./download.sh")
     print("="*50 + "\n")
 
 def download_videos(force=False):
@@ -263,15 +264,14 @@ def download_videos(force=False):
                     failed_items.append(vid)
     
     print("\n" + "="*50)
-    print(f"🎉  Download Batch Finished!")
+    print("🎉  Download Batch Finished!")
     print(f"✅  Successful: {success_count}/{total_videos}")
     
     if failed_items:
         print(f"❌  Failed: {len(failed_items)}")
         with open(FAILED_LOG, "w", encoding="utf-8") as f:
             f.write("# Failed Downloads List\n")
-            for item in failed_items:
-                f.write(f"{item['index']} | {item['title']} | {item['url']}\n")
+            f.writelines(f"{item['index']} | {item['title']} | {item['url']}\n" for item in failed_items)
         print(f"\n📂  Failed list saved to: {FAILED_LOG}")
             
     print(f"📂  Location: {os.path.abspath(OUTPUT_DIR)}")
@@ -434,7 +434,7 @@ def process_single_url(url, verbose=False, download=True):
     
     # --- Interactive Metadata Correction ---
     if section == "General":
-        print(f"   ⚠️  Section detection defaulted to 'General'.")
+        print("   ⚠️  Section detection defaulted to 'General'.")
         user_sec = input(f"   ✍️  Enter correct Section name (or Press Enter to keep '{section}'): ").strip()
         if user_sec:
             section = user_sec
@@ -486,7 +486,7 @@ def process_single_url(url, verbose=False, download=True):
             
         # 4. Download Video
         if video_url:
-            print(f"   ⬇️ Downloading video...")
+            print("   ⬇️ Downloading video...")
             # Mock pbar
             class MockPbar:
                 def update(self, n): pass
@@ -593,7 +593,7 @@ def insert_into_manifest(entry_data):
             if insert_into_manifest(entry):
                 print(f"   📝 Inserted into manifest: {MANIFEST_FILE}")
             else:
-                print(f"   ⚠️ Failed to update manifest.")
+                print("   ⚠️ Failed to update manifest.")
                 
         else: print("   ❌ Video Download Failed")
     else:

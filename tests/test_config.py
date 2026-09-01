@@ -1,6 +1,8 @@
 import os
-from unittest.mock import patch, mock_open
-from src.config import load_config, get_storage_config, get_path
+from unittest.mock import patch
+
+from src.config import get_path, get_storage_config, load_config
+
 
 def test_load_config_missing():
     with patch('os.path.exists', return_value=False):

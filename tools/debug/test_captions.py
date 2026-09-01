@@ -1,6 +1,6 @@
 
 import re
-import json
+
 
 def format_caption(meta, extra):
     header_parts = [f"**{meta['course']}**"]

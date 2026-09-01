@@ -1,10 +1,12 @@
+import asyncio
+import json
 import os
 import sys
-import json
-import asyncio
+
 from dotenv import load_dotenv
-from src.env_resolver import env_path
 from pyrogram import Client
+
+from src.env_resolver import env_path
 
 # Add project root to path
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))

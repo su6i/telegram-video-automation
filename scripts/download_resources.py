@@ -9,17 +9,14 @@ Usage:
     python scripts/download_resources.py --all               # Do everything
 """
 
+import argparse
+import json
 import os
 import sys
-import json
-import requests
-import argparse
-from pathlib import Path
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from src.page_archiver import archive_page, list_archived_pages
-from src.scrapers.primary_scraper import PrimaryScraper
+from src.page_archiver import archive_page
 
 STORAGE_DIR = ".storage"
 MANIFEST_FILE = os.path.join(STORAGE_DIR, "downloaded_video.txt")
@@ -82,7 +79,7 @@ def archive_all_pages():
             time.sleep(0.5)
     
     print("\n" + "="*60)
-    print(f"✅ Archive Complete!")
+    print("✅ Archive Complete!")
     print(f"  Successful: {successful}")
     print(f"  Failed: {failed}")
     print(f"  📁 Location: {os.path.abspath(os.path.join(STORAGE_DIR, 'page_archives'))}")
@@ -121,14 +118,14 @@ def extract_all_links():
     with open(LINKS_LOG, 'w', encoding='utf-8') as f:
         json.dump(all_links, f, indent=2, ensure_ascii=False)
     
-    print(f"\n📊 Summary:")
+    print("\n📊 Summary:")
     print(f"  Videos with resources: {len(all_links)}")
     
     total_resources = sum(v['resource_count'] for v in all_links.values())
     print(f"  Total resource links: {total_resources}")
     
     # Print sample
-    print(f"\n📌 Sample resources:")
+    print("\n📌 Sample resources:")
     for title, data in list(all_links.items())[:3]:
         print(f"\n  📄 {title}")
         for link in data['links'][:2]:

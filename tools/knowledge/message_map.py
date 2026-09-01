@@ -25,11 +25,11 @@ from pathlib import Path
 
 sys.path.append(str(Path(__file__).resolve().parents[2]))
 
-from src.caption_index import extract_index_and_title
-
 from dotenv import load_dotenv
-from src.env_resolver import env_path as vault_env_path
 from pyrogram import Client
+
+from src.caption_index import extract_index_and_title
+from src.env_resolver import env_path as vault_env_path
 
 
 def load_backup(path):
@@ -156,7 +156,7 @@ def main():
     if missing:
         print(f"Missing: {', '.join(missing)}")
     else:
-        print(f"Missing: (none)")
+        print("Missing: (none)")
         
     return 0
 

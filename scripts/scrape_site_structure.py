@@ -5,13 +5,15 @@ Extracts all sections, lessons, and lesson types
 """
 
 import json
-from selenium import webdriver
-from selenium.webdriver.common.by import By
-from selenium.webdriver.support.ui import WebDriverWait
-from selenium.webdriver.support import expected_conditions as EC
-from selenium.webdriver.chrome.service import Service
-from webdriver_manager.chrome import ChromeDriverManager
 import time
+
+from selenium import webdriver
+from selenium.webdriver.chrome.service import Service
+from selenium.webdriver.common.by import By
+from selenium.webdriver.support import expected_conditions as EC
+from selenium.webdriver.support.ui import WebDriverWait
+from webdriver_manager.chrome import ChromeDriverManager
+
 
 def scrape_course_structure(url, course_name):
     """
@@ -82,7 +84,7 @@ def scrape_course_structure(url, course_name):
                         
                         print(f"  - [{lesson_type}] {lesson_text[:80]}")
                         
-                    except Exception as e:
+                    except Exception:
                         continue
                 
                 if section_lessons:

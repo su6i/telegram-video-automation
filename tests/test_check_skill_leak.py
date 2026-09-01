@@ -7,7 +7,7 @@ import pytest
 
 sys.path.append(str(Path(__file__).resolve().parents[1] / "tools" / "knowledge"))
 
-from check_skill_leak import (  # noqa: E402
+from check_skill_leak import (
     build_banned,
     corpus_ngrams,
     find_banned,

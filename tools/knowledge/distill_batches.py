@@ -24,7 +24,7 @@ from pathlib import Path
 
 sys.path.append(str(Path(__file__).resolve().parents[2]))
 
-import src.manifest_tracker as manifest_tracker
+from src import manifest_tracker
 
 # Sections that teach nothing transferable — housekeeping, community links,
 # discount codes. They produce no skill.

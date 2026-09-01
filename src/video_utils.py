@@ -1,12 +1,12 @@
-import os
-import subprocess
 import json
 import math
 import os
 import re
 import shutil
-from PIL import Image, ImageDraw, ImageFont
+import subprocess
 import textwrap
+
+from PIL import Image, ImageDraw, ImageFont
 
 # Threshold for splitting (45MB)
 SIZE_THRESHOLD_MB = 45
@@ -115,7 +115,7 @@ def get_video_info(input_path):
             }
         
         return None
-    except Exception as e:
+    except Exception:
         # print(f"Error getting video info: {str(e)}") # Suppress noise
         return None
 
@@ -297,7 +297,6 @@ def add_intro_to_video(video_path, title, output_path):
         # Strategy: 
         # We are re-encoding in process_safe anyway. So we can do it there.
         # Doing it separately is redundant.
-        pass 
         
     except Exception as e:
         print(f"Error adding intro: {e}")
@@ -424,16 +423,16 @@ async def process_video_for_bot_safe(input_path, output_path, title, add_intro=F
             print(f"   ✅ Success - Size: {new_size:.2f}MB, Final: {final_w}x{final_h}")
             return True
         else:
-            print(f"   ❌ Output file not created or too small")
+            print("   ❌ Output file not created or too small")
             return False
         
     except subprocess.TimeoutExpired:
-        print(f"   ❌ Processing timeout (20 minutes exceeded)")
+        print("   ❌ Processing timeout (20 minutes exceeded)")
         if 'intro_created' in locals() and intro_created and os.path.exists(intro_path):
             os.remove(intro_path)
         return False
     except Exception as e:
-        print(f"   ❌ Processing error: {str(e)}")
+        print(f"   ❌ Processing error: {e!s}")
         if 'intro_created' in locals() and intro_created and os.path.exists(intro_path):
             os.remove(intro_path)
         return False
@@ -470,7 +469,7 @@ async def process_video_for_user_safe(input_path, output_path, title, add_intro=
         
         if intro_created:
             # ✅ With intro: re-encode needed for concat
-            print(f"   🎞️ Intro created - re-encoding required...")
+            print("   🎞️ Intro created - re-encoding required...")
             
             # ✅ Auto-detect hardware encoder
             encoder = detect_hw_encoder()
@@ -562,16 +561,16 @@ async def process_video_for_user_safe(input_path, output_path, title, add_intro=
             print(f"   ✅ Success - Size: {new_size:.2f}MB, Final: {final_w}x{final_h}")
             return True
         else:
-            print(f"   ❌ Output file not created or too small")
+            print("   ❌ Output file not created or too small")
             return False
         
     except subprocess.TimeoutExpired:
-        print(f"   ❌ Processing timeout (30 minutes exceeded)")
+        print("   ❌ Processing timeout (30 minutes exceeded)")
         if 'intro_created' in locals() and intro_created and os.path.exists(intro_path):
             os.remove(intro_path)
         return False
     except Exception as e:
-        print(f"   ❌ Processing error: {str(e)}")
+        print(f"   ❌ Processing error: {e!s}")
         if 'intro_created' in locals() and intro_created and os.path.exists(intro_path):
             os.remove(intro_path)
         return False
@@ -674,11 +673,11 @@ async def split_video_for_bot_safe(input_path, output_dir, title, target_size_mb
                     "-i", input_path,
                     "-t", str(segment_duration), # duration from seek point
                     "-filter_complex",
-                    f"[0:v]fps=25[v0];"
-                    f"[1:v]fps=25[v1];"
-                    f"[0:a]aresample=44100,aformat=sample_fmts=fltp:channel_layouts=stereo[a0];"
-                    f"[1:a]aresample=44100,aformat=sample_fmts=fltp:channel_layouts=stereo[a1];"
-                    f"[v0][a0][v1][a1]concat=n=2:v=1:a=1[outv][outa]",
+                    "[0:v]fps=25[v0];"
+                    "[1:v]fps=25[v1];"
+                    "[0:a]aresample=44100,aformat=sample_fmts=fltp:channel_layouts=stereo[a0];"
+                    "[1:a]aresample=44100,aformat=sample_fmts=fltp:channel_layouts=stereo[a1];"
+                    "[v0][a0][v1][a1]concat=n=2:v=1:a=1[outv][outa]",
                     "-map", "[outv]", "-map", "[outa]",
                     "-c:v", "libx264",
                     "-c:a", "aac",
@@ -717,7 +716,7 @@ async def split_video_for_bot_safe(input_path, output_dir, title, target_size_mb
                 print(f"   ⏰ Timeout in part {i+1}")
                 continue
             except Exception as e:
-                print(f"   ❌ Error in part {i+1}: {str(e)}")
+                print(f"   ❌ Error in part {i+1}: {e!s}")
                 continue
         
         if intro_created and os.path.exists(intro_path):
@@ -726,7 +725,7 @@ async def split_video_for_bot_safe(input_path, output_dir, title, target_size_mb
         return output_files
         
     except Exception as e:
-        print(f"❌ Error during split: {str(e)}")
+        print(f"❌ Error during split: {e!s}")
         if 'intro_path' in locals() and os.path.exists(intro_path): os.remove(intro_path)
         return []
 
@@ -775,11 +774,11 @@ async def split_video_for_user_safe(input_path, output_dir, title, target_size_m
                     "-i", input_path,
                     "-t", str(segment_duration),
                     "-filter_complex",
-                    f"[0:v]fps=25[v0];"
-                    f"[1:v]fps=25[v1];"
-                    f"[0:a]aresample=44100,aformat=sample_fmts=fltp:channel_layouts=stereo[a0];"
-                    f"[1:a]aresample=44100,aformat=sample_fmts=fltp:channel_layouts=stereo[a1];"
-                    f"[v0][a0][v1][a1]concat=n=2:v=1:a=1[outv][outa]",
+                    "[0:v]fps=25[v0];"
+                    "[1:v]fps=25[v1];"
+                    "[0:a]aresample=44100,aformat=sample_fmts=fltp:channel_layouts=stereo[a0];"
+                    "[1:a]aresample=44100,aformat=sample_fmts=fltp:channel_layouts=stereo[a1];"
+                    "[v0][a0][v1][a1]concat=n=2:v=1:a=1[outv][outa]",
                     "-map", "[outv]", "-map", "[outa]",
                     "-c:v", "libx264",
                     "-c:a", "aac",
@@ -810,7 +809,7 @@ async def split_video_for_user_safe(input_path, output_dir, title, target_size_m
                 else:
                     print(f"   ❌ Error in part {i+1}: {result.stderr[-200:] if result.stderr else 'unknown'}")
             except Exception as e:
-                print(f"   ❌ Error in part {i+1}: {str(e)}")
+                print(f"   ❌ Error in part {i+1}: {e!s}")
         
         if intro_created and os.path.exists(intro_path):
             os.remove(intro_path)
@@ -818,7 +817,7 @@ async def split_video_for_user_safe(input_path, output_dir, title, target_size_m
         return output_files
         
     except Exception as e:
-        print(f"❌ Error during user split: {str(e)}")
+        print(f"❌ Error during user split: {e!s}")
         return []
 
 def normalize_title(title):

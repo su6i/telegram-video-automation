@@ -1,24 +1,21 @@
 import json
-import time
+import os
 import re
-from typing import List, Dict, Optional, Set
-from datetime import datetime
+import time
 from urllib.parse import urljoin
 
-from src.site_profile import course_title_for
-from selenium import webdriver
-from selenium.webdriver.chrome.service import Service
-from selenium.webdriver.chrome.options import Options
-from webdriver_manager.chrome import ChromeDriverManager
-from selenium.webdriver.common.by import By
-from selenium.webdriver.support.ui import WebDriverWait
-from selenium.webdriver.support import expected_conditions as EC
 from bs4 import BeautifulSoup
-from .base import BaseScraper
-import os
 from dotenv import load_dotenv
-from src.env_resolver import env_path
+from selenium import webdriver
+from selenium.webdriver.chrome.options import Options
+from selenium.webdriver.chrome.service import Service
+from webdriver_manager.chrome import ChromeDriverManager
+
 from src import config
+from src.env_resolver import env_path
+from src.site_profile import course_title_for
+
+from .base import BaseScraper
 
 load_dotenv(env_path())
 
@@ -27,7 +24,6 @@ STRUCTURE_FILE = os.path.join(STORAGE_DIR, "course_structure.json")
 
 class FatalScraperError(Exception):
     """Raised when a persistent network error occurs that should stop the scan."""
-    pass
 
 class PrimaryScraper(BaseScraper):
     def __init__(self):
@@ -181,7 +177,7 @@ class PrimaryScraper(BaseScraper):
                 print("⚠️ Browser left open for debug.")
 
     def _discover_course_structure(self, driver, course_url, verbose=False):
-        if course_url.endswith("/"): course_url = course_url[:-1]
+        course_url = course_url.removesuffix("/")
         course_slug = course_url.split("/")[-1]
         
         # Determine Title
@@ -584,7 +580,7 @@ class PrimaryScraper(BaseScraper):
         return collected_lessons
 
     # --- EXISTING HELPER METHODS ---
-    def _get_enrolled_courses(self) -> List[str]:
+    def _get_enrolled_courses(self) -> list[str]:
         library_url = f"{self.base_url}/library"
         while True:
             driver = self._get_driver()

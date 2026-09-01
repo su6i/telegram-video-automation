@@ -3,10 +3,12 @@
 Unified Entry Point for Telegram Video Automation
 Target: World-Class Open Source Standards
 """
+import argparse
 import os
 import sys
-import argparse
+
 from dotenv import load_dotenv
+
 from src.env_resolver import env_path
 
 # Ensure we can import from src and scripts
@@ -14,8 +16,13 @@ sys.path.append(os.path.join(os.path.dirname(__file__), 'src'))
 sys.path.append(os.path.join(os.path.dirname(__file__), 'scripts'))
 
 try:
+    from scripts.scraper import (
+        archive_manifest_pages,
+        download_videos,
+        process_single_url,
+        scan_videos,
+    )
     from src.i18n import t
-    from scripts.scraper import scan_videos, download_videos, archive_manifest_pages, process_single_url
 except ImportError as e:
     print(f"❌ Critical Import Error: {e}")
     sys.exit(1)
@@ -23,7 +30,6 @@ except ImportError as e:
 def setup_environment():
     load_dotenv(env_path())
     # verify essential env vars if needed
-    pass
 
 def main():
     setup_environment()

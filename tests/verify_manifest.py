@@ -29,7 +29,7 @@ def verify_manifest():
                     duplicates.append(url)
                 urls.add(url) if isinstance(urls, set) else urls.append(url)
 
-    print(f"📊 Manifest Verification:")
+    print("📊 Manifest Verification:")
     print(f"   - Total Videos: {total_lines}")
     print(f"   - Unique URLs: {len(set(urls))}")
     
@@ -38,7 +38,7 @@ def verify_manifest():
         for d in duplicates[:5]:
             print(f"      - {d}")
     else:
-        print(f"   ✅ No duplicates found.")
+        print("   ✅ No duplicates found.")
 
 if __name__ == "__main__":
     verify_manifest()

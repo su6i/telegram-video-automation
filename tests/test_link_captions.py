@@ -2,11 +2,9 @@
 import sys
 from pathlib import Path
 
-import pytest
-
 sys.path.append(str(Path(__file__).resolve().parents[1] / "tools" / "knowledge"))
 
-from link_captions import (  # noqa: E402
+from link_captions import (
     CAPTION_LIMIT,
     RESOURCES_LABEL,
     RESOURCES_LABEL_SHORT,
