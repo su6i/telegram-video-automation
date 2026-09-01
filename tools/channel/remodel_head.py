@@ -289,8 +289,9 @@ async def main():
     chat_id = int(os.getenv("CHANNEL_ID"))
     internal = abs(chat_id) - 1000000000000
 
-    mp = json.load(open(data / "message_ids.json"))
-    attach_state = json.load(open(data / "attachments_state.json"))
+    mp = json.loads((data / "message_ids.json").read_text(encoding="utf-8"))
+    attach_state = json.loads(
+        (data / "attachments_state.json").read_text(encoding="utf-8"))
     msg_of = {k: (v if isinstance(v, int) else v.get("video")) for k, v in mp.items()}
     entries = read_manifest()
     live_by_title = {t: msg_of.get(num) for _, _, num, t in entries}
@@ -325,7 +326,8 @@ async def main():
                     backup[m.id] = m.text or m.caption or ""
 
         if args.backup:
-            json.dump(backup, open(args.backup, "w"), ensure_ascii=False, indent=1)
+            with open(args.backup, "w", encoding="utf-8") as fh:
+                json.dump(backup, fh, ensure_ascii=False, indent=1)
             print(f"💾 backed up {len(backup)} messages -> {args.backup}")
 
         if args.preview:

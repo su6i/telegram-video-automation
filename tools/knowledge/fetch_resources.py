@@ -34,7 +34,7 @@ def manifest_index_by_url(path):
     out = {}
     if not os.path.exists(path):
         return out
-    for line in open(path, encoding="utf-8"):
+    for line in Path(path).read_text(encoding="utf-8").splitlines():
         m = re.match(r"^(\d{3})_.*?\s\|\s(\S+)", line.strip())
         if m:
             out[m.group(2)] = m.group(1)

@@ -3,6 +3,18 @@
 ## Unreleased
 
 ### Fixed
+- `pytest` is now a warning gate: `pytest.ini` gets `filterwarnings = error`
+  plus a single documented ignore for pyrogram 2.0.106's
+  `asyncio.get_event_loop()` DeprecationWarning (raised at import time in
+  `pyrogram/sync.py:31`, third-party and unfixable from here — pyrogram is
+  unmaintained since 2023). Turning warnings into errors surfaced six real
+  unclosed-file leaks (`ResourceWarning`), all now fixed: `open(...)` used as
+  an iterator/`.read()` without a context manager in
+  `tools/knowledge/check_skill_leak.py` (x2), `tools/knowledge/fetch_resources.py`,
+  `tests/test_caption_index.py`, and two bare `open()` calls handed to
+  `json.load`/`json.dump` in `tools/channel/remodel_head.py` — the `json.dump`
+  one could leave a truncated, unflushed `--apply` backup file behind.
+  73 passed, 0 warnings. (T-935)
 - Two of T-933's F821 (undefined-name) findings fixed: `scripts/replace_video.py`
   was calling `re.split()` without `import re`. `scripts/process_and_upload.py`
   caught `AuthPasswordInvalid`, a name that doesn't exist anywhere in `pyrogram`
