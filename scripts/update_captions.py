@@ -14,12 +14,13 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from src.caption_index import extract_index_and_title, safe_extract_number
 
 from dotenv import load_dotenv
+from src.env_resolver import env_path
 from pyrogram import Client
 from pyrogram.errors import RPCError, ChatAdminRequired
 from pyrogram.enums import ChatType, ParseMode
 
 # =========================== Env & Config ===========================
-load_dotenv()
+load_dotenv(env_path())
 
 API_ID = int(os.getenv("API_ID", "0") or "0")
 API_HASH = os.getenv("API_HASH", "")

@@ -3,6 +3,7 @@ import sys
 import json
 import asyncio
 from dotenv import load_dotenv
+from src.env_resolver import env_path
 from pyrogram import Client
 
 # Add project root to path
@@ -10,7 +11,7 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 # Load env
 folder_path = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-load_dotenv(os.path.join(folder_path, ".env"))
+load_dotenv(env_path())
 
 API_ID = os.getenv("API_ID")
 API_HASH = os.getenv("API_HASH")

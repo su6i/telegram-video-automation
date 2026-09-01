@@ -1,4 +1,3 @@
-
 import json
 import time
 import os
@@ -10,7 +9,8 @@ from selenium.webdriver.chrome.options import Options
 
 # Load environment to get base URL
 from dotenv import load_dotenv
-load_dotenv()
+from src.env_resolver import env_path
+load_dotenv(env_path())
 
 TARGET_URL = os.getenv("TARGET_SITE_BASE_URL", "https://example.com") + "/login"
 COOKIES_FILE = "auth_cookies.json"

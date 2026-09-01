@@ -7,6 +7,7 @@ import asyncio
 import json
 import re
 from dotenv import load_dotenv
+from src.env_resolver import env_path
 import math
 from datetime import datetime, timedelta
 
@@ -29,7 +30,7 @@ from src.telegram_utils import (
 )
 
 # Load environment variables from .env
-load_dotenv()
+load_dotenv(env_path())
 
 # Bot Config
 telegram_token = os.getenv("TELEGRAM_TOKEN")

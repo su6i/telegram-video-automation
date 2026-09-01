@@ -17,9 +17,10 @@ from bs4 import BeautifulSoup
 from .base import BaseScraper
 import os
 from dotenv import load_dotenv
+from src.env_resolver import env_path
 from src import config
 
-load_dotenv()
+load_dotenv(env_path())
 
 STORAGE_DIR = config.get_path("base_dir")
 STRUCTURE_FILE = os.path.join(STORAGE_DIR, "course_structure.json")

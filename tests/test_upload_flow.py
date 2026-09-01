@@ -1,9 +1,10 @@
 import os
 import asyncio
 from dotenv import load_dotenv
+from src.env_resolver import env_path
 from src.video_utils import process_video_for_bot_safe
 
-load_dotenv()
+load_dotenv(env_path())
 
 video_dir = "sample_videos"
 output_dir = "sample_videos_processed"

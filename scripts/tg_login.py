@@ -10,10 +10,11 @@ import os
 import sys
 
 from dotenv import load_dotenv
+from src.env_resolver import env_path
 from pyrogram import Client
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-load_dotenv(os.path.join(ROOT, ".env"))
+load_dotenv(env_path())
 
 api_id = os.getenv("API_ID")
 api_hash = os.getenv("API_HASH")

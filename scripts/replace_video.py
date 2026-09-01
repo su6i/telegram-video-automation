@@ -1,4 +1,3 @@
-
 import os
 import sys
 import asyncio
@@ -6,6 +5,7 @@ import argparse
 from pyrogram import Client, enums
 from pyrogram.types import InputMediaVideo
 from dotenv import load_dotenv
+from src.env_resolver import env_path
 
 # Add project root to path
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -93,7 +93,7 @@ def load_extra_content(url):
 # -------------------------------------------------------------------
 
 # Load Env
-load_dotenv()
+load_dotenv(env_path())
 API_ID = os.getenv("API_ID")
 API_HASH = os.getenv("API_HASH")
 CHANNEL_ID = int(os.getenv("CHANNEL_ID"))

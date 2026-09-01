@@ -27,6 +27,7 @@ from collections import defaultdict
 from pathlib import Path
 
 from dotenv import load_dotenv
+from src.env_resolver import env_path as vault_env_path
 
 
 def get_signature(lesson_dir):
@@ -435,7 +436,7 @@ def main():
                          "use it to try --go on a single lesson first")
     ap.add_argument("--delay", type=float, default=2.0,
                     help="seconds to pause after each send; the channel limit is per-minute")
-    ap.add_argument("--env", default=".env", help="path to .env file")
+    ap.add_argument("--env", default=str(vault_env_path()), help="path to .env file")
     ap.add_argument("--workdir", default=".", help="pyrogram workdir")
     
     group = ap.add_mutually_exclusive_group()

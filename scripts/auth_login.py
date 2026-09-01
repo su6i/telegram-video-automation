@@ -1,5 +1,6 @@
 from pyrogram import Client
 from dotenv import load_dotenv
+from src.env_resolver import env_path
 import os
 import sys
 
@@ -7,8 +8,7 @@ import sys
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 # Load from root .env
-root_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-load_dotenv(os.path.join(root_dir, ".env"))
+load_dotenv(env_path())
 
 api_id = os.getenv("API_ID")
 api_hash = os.getenv("API_HASH")

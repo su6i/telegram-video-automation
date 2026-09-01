@@ -7,6 +7,7 @@ import os
 import sys
 import argparse
 from dotenv import load_dotenv
+from src.env_resolver import env_path
 
 # Ensure we can import from src and scripts
 sys.path.append(os.path.join(os.path.dirname(__file__), 'src'))
@@ -20,7 +21,7 @@ except ImportError as e:
     sys.exit(1)
 
 def setup_environment():
-    load_dotenv()
+    load_dotenv(env_path())
     # verify essential env vars if needed
     pass
 
