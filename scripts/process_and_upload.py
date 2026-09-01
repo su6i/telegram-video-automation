@@ -17,7 +17,7 @@ HAS_TQDM = False
 tqdm = None
 
 from pyrogram import Client
-from pyrogram.errors import SessionPasswordNeeded
+from pyrogram.errors import PasswordHashInvalid, SessionPasswordNeeded
 from telegram import Bot
 
 # Add project root to sys.path
@@ -399,7 +399,7 @@ async def main():
                     try:
                         await app.check_password(pw)
                         break
-                    except AuthPasswordInvalid:
+                    except PasswordHashInvalid:
                         print("❌ Incorrect password. Please try again.")
                 else:
                     print("❌ Too many failed attempts.")
