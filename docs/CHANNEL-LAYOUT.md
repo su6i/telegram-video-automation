@@ -57,9 +57,20 @@ It is idempotent — Telegram answers `MessageNotModified` for a slot that is
 already correct — and it handles `FloodWait` by waiting rather than dropping the
 edit. The backup file is the only way back: keep it.
 
-## Stage 2 (not done, needs an owner decision)
+## Stage 2 (built, not yet applied)
 
 The superseded uploads are still videos taking up the scroll. A caption cannot
 turn a video message into a text message; only deletion can free that space, and
-deleting them would renumber nothing but would lose the slots. That trade is the
-owner's call, not the tool's.
+deleting them would renumber nothing but would lose the slots. The owner has
+decided to delete them (2026-09-01); `tools/channel/purge_superseded.py` does
+it — same `--dup-range` default (`"65-109,126-237"`), same dry-run-by-default
+shape as `remodel_head.py`, reusing its `duplicate_title`/`read_manifest` to
+identify each candidate's live lesson for the report:
+
+```bash
+uv run --directory /Users/su6i/@-github/telegram-video-automation tools/channel/purge_superseded.py --backup /tmp/purge_backup.json
+```
+
+Deletion is irreversible — there is no restore, only the `--backup` JSON
+(caption + matched title per id, written before any delete call). `--apply`
+is owner-run only, same as `remodel_head.py --apply`.

@@ -21,6 +21,16 @@
   `.gitignore`. (T-932)
 
 ### Added
+- New tool `tools/channel/purge_superseded.py` — Stage 2 of the channel remodel
+  (`docs/CHANNEL-LAYOUT.md`): deletes the superseded-upload videos in id ranges
+  `65-109` and `126-237` that Stage 1 (`remodel_head.py`) only re-captions.
+  Reuses `remodel_head.py`'s `duplicate_title`/`read_manifest` for candidate
+  identification, follows `scripts/purge_batch.py`'s dry-run/`--apply`/FloodWait
+  shape. Dry-run by default; writes a `--backup` JSON (caption + matched title
+  per id) before any delete call, and aborts before deleting if the backup
+  write fails. Dry run against the live channel confirms 71 candidate messages
+  under the current default ranges; `--apply` has not been run — that's an
+  owner-run step, same as `remodel_head.py --apply`. (WO-TVA-0007)
 - `ruff` added as a dev dependency (`[dependency-groups] dev`) with a minimal
   `[tool.ruff]` section (no custom rule overrides — plain ruff defaults) to
   give this repo its first lint gate. Ran `ruff check --fix .` and committed
