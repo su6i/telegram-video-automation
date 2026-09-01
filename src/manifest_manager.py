@@ -1,8 +1,9 @@
 import os
+import re
 import shutil
 import threading
-import re
 from datetime import datetime
+
 
 class ManifestManager:
     def __init__(self, storage_dir=".storage", manifest_filename="downloaded_video.txt"):
@@ -227,45 +228,44 @@ class ManifestManager:
         #     v['index'] = f"{idx:03d}"
         
         # 5. Write Manifest
-        with self.lock:
-            with open(self.manifest_file, "w", encoding="utf-8") as f:
-                f.write(f"# Index_Title | URL\n")
-                f.write(f"# To skip a video, delete the line or put a '#' at the start\n")
+        with self.lock, open(self.manifest_file, "w", encoding="utf-8") as f:
+            f.write("# Index_Title | URL\n")
+            f.write("# To skip a video, delete the line or put a '#' at the start\n")
+            
+            current_course = None
+            current_category = None
+            current_subsection_header = None
+            
+            for v in final_videos:
+                c_title = v['course_title']
+                cat = v.get('category', v['section'])
+                sub = v.get('subsection')
+                sec_name = v['section']
                 
-                current_course = None
-                current_category = None
-                current_subsection_header = None
+                if c_title != current_course:
+                    current_course = c_title
+                    count = sum(1 for x in final_videos if x['course_title'] == c_title)
+                    f.write(f"\n# === {c_title} ({count} videos) ===\n")
+                    current_category = None
+                    current_subsection_header = None
                 
-                for v in final_videos:
-                    c_title = v['course_title']
-                    cat = v.get('category', v['section'])
-                    sub = v.get('subsection')
-                    sec_name = v['section']
-                    
-                    if c_title != current_course:
-                        current_course = c_title
-                        count = sum(1 for x in final_videos if x['course_title'] == c_title)
-                        f.write(f"\n# === {c_title} ({count} videos) ===\n")
-                        current_category = None
-                        current_subsection_header = None
-                    
-                    actual_cat = cat if cat else sec_name
-                    if actual_cat != current_category:
-                        f.write(f"\n## --- {actual_cat} ---\n")
-                        current_category = actual_cat
-                        current_subsection_header = None
-                    
-                    if sub and sub != actual_cat:
-                        if sub != current_subsection_header:
-                            f.write(f"### {sub}\n")
-                            current_subsection_header = sub
-                    
-                    status_pfx = "# [DONE] " if v.get('is_done') else ""
-                    clean_title = v['title'].replace("\n", " ").strip()
-                    
-                    # 2-column format: Index_Title | URL
-                    idx_display = v['index'] if v['index'] else "999"
-                    line = f"{idx_display}_{clean_title} | {v['url']}"
-                    f.write(f"{status_pfx}{line}\n")
+                actual_cat = cat if cat else sec_name
+                if actual_cat != current_category:
+                    f.write(f"\n## --- {actual_cat} ---\n")
+                    current_category = actual_cat
+                    current_subsection_header = None
                 
-                print(f"   ✅ Manifest saved: {len(final_videos)} entries")
+                if sub and sub != actual_cat:
+                    if sub != current_subsection_header:
+                        f.write(f"### {sub}\n")
+                        current_subsection_header = sub
+                
+                status_pfx = "# [DONE] " if v.get('is_done') else ""
+                clean_title = v['title'].replace("\n", " ").strip()
+                
+                # 2-column format: Index_Title | URL
+                idx_display = v['index'] if v['index'] else "999"
+                line = f"{idx_display}_{clean_title} | {v['url']}"
+                f.write(f"{status_pfx}{line}\n")
+            
+            print(f"   ✅ Manifest saved: {len(final_videos)} entries")

@@ -1,7 +1,8 @@
 import sys
-import argparse
-from unittest.mock import patch, MagicMock
+from unittest.mock import patch
+
 from main import main
+
 
 def test_main_help(capsys):
     with patch.object(sys, 'argv', ['main.py', '--help']):

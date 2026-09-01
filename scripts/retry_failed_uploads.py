@@ -1,32 +1,24 @@
-import os
-import subprocess
-from telegram import Bot
-from telegram.error import TelegramError
-from pyrogram import Client
 import asyncio
-import json
-import re
+import os
+
 from dotenv import load_dotenv
+from pyrogram import Client
+from telegram import Bot
+
 from src.env_resolver import env_path
-import math
-from datetime import datetime, timedelta
+from src.telegram_utils import (
+    decide_upload_method,
+    upload_with_bot,
+    upload_with_user_account,
+)
 
 # Import Shared Modules
 from src.video_utils import (
-    get_video_info,
-    calculate_optimal_segments,
+    SIZE_THRESHOLD_MB,
+    normalize_title,
     process_video_for_bot_safe,
     process_video_for_user_safe,
     split_video_for_bot_safe,
-    normalize_title,
-    SIZE_THRESHOLD_MB,
-    BOT_MAX_SIZE_MB,
-    USER_MAX_SIZE_MB
-)
-from src.telegram_utils import (
-    upload_with_bot,
-    upload_with_user_account,
-    decide_upload_method
 )
 
 # Load environment variables from .env
@@ -94,7 +86,7 @@ async def get_channel_videos(app):
         return uploaded_videos
         
     except Exception as e:
-        print(f"❌ Error fetching channel list: {str(e)}")
+        print(f"❌ Error fetching channel list: {e!s}")
         return set()
 
 def get_local_videos():
@@ -117,7 +109,7 @@ def get_local_videos():
         return video_files
         
     except Exception as e:
-        print(f"❌ Error reading local files: {str(e)}")
+        print(f"❌ Error reading local files: {e!s}")
         return []
 
 def find_missing_videos(local_videos, uploaded_videos):
@@ -196,7 +188,7 @@ async def retry_failed_uploads():
                         upload_success = await upload_with_bot(output_path, title, telegram_token, channel_id)
                         if upload_success:
                             processed_count += 1
-                            print(f"🎉 Bot upload successful!")
+                            print("🎉 Bot upload successful!")
                         else:
                             failed_count += 1
                         
@@ -229,7 +221,7 @@ async def retry_failed_uploads():
                         
                         if upload_success_count == len(output_files):
                             processed_count += 1
-                            print(f"🎊 All parts uploaded with bot!")
+                            print("🎊 All parts uploaded with bot!")
                         else:
                             failed_count += 1
                     else:
@@ -244,7 +236,7 @@ async def retry_failed_uploads():
                     upload_success = await upload_with_user_account(app, output_path, title, channel_username)
                     if upload_success:
                         processed_count += 1
-                        print(f"🎉 User account upload successful!")
+                        print("🎉 User account upload successful!")
                     else:
                         failed_count += 1
                     
@@ -263,7 +255,7 @@ async def retry_failed_uploads():
                 await asyncio.sleep(delay)
         
         print(f"\n{'='*60}")
-        print(f"📊 Retry Summary:")
+        print("📊 Retry Summary:")
         print(f"   📁 Missing files: {len(missing_videos)}")
         print(f"   ✅ Successful: {processed_count}")
         print(f"   ❌ Failed: {failed_count}")
@@ -272,12 +264,12 @@ async def retry_failed_uploads():
         
         # Show remaining files
         if failed_count > 0:
-            print(f"\n⚠️ Files that are still missing may require manual review.")
+            print("\n⚠️ Files that are still missing may require manual review.")
         
     except KeyboardInterrupt:
         print("\n⚠️ Stopped by Ctrl+C")
     except Exception as e:
-        print(f"❌ Unexpected Error: {str(e)}")
+        print(f"❌ Unexpected Error: {e!s}")
     finally:
         await app.stop()
         print("🔒 Connection closed")

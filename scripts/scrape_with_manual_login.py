@@ -4,14 +4,12 @@ Scrape course structure after manual login
 Waits for user to login, then scrapes the categories page
 """
 
-import json
+import time
+
 from selenium import webdriver
-from selenium.webdriver.common.by import By
-from selenium.webdriver.support.ui import WebDriverWait
-from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.chrome.service import Service
 from webdriver_manager.chrome import ChromeDriverManager
-import time
+
 
 def scrape_after_login(login_url, target_url):
     """
@@ -60,17 +58,17 @@ def scrape_after_login(login_url, target_url):
                 
                 # Try to navigate to target URL
                 if elapsed % 10 == 0 and elapsed > 0:
-                    print(f"\n   Trying to navigate to target page...")
+                    print("\n   Trying to navigate to target page...")
                     driver.get(target_url)
                 
                 time.sleep(check_interval)
                 elapsed += check_interval
                 
-            except Exception as e:
+            except Exception:
                 time.sleep(check_interval)
                 elapsed += check_interval
         
-        print(f"\n✅ Proceeding to scrape content...\n")
+        print("\n✅ Proceeding to scrape content...\n")
         
         # Navigate to target URL
         driver.get(target_url)

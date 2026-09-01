@@ -24,3 +24,10 @@ dependencies = [
     "tqdm>=4.67.1",
     "yt-dlp>=2025.7.21",
 ]
+
+[dependency-groups]
+dev = [
+    "ruff>=0.15.22",
+]
+
+[tool.ruff]

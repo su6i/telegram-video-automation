@@ -86,8 +86,8 @@ def main():
         return 0
 
     # Imported here so --help works without the model stack installed.
-    import mlx_whisper
     import mlx.core as mx
+    import mlx_whisper
 
     # MLX hands freed buffers to a reuse cache that is unbounded by default, so
     # a long run climbs to tens of GB of unified memory and the machine starts

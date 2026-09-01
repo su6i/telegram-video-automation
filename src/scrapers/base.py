@@ -1,10 +1,9 @@
 from abc import ABC, abstractmethod
-from typing import List, Dict, Optional
-from datetime import datetime
+
 
 class BaseScraper(ABC):
     @abstractmethod
-    def get_video_links(self, limit: Optional[int] = None) -> List[Dict]:
+    def get_video_links(self, limit: int | None = None) -> list[dict]:
         """
         Scrapes video links and metadata.
         Returns a list of dictionaries with keys:
@@ -13,4 +12,3 @@ class BaseScraper(ABC):
         - date: datetime (for sorting)
         - sort_index: int (optional, as fallback)
         """
-        pass

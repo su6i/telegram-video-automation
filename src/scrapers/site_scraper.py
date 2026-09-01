@@ -1,14 +1,17 @@
-import requests
-from bs4 import BeautifulSoup
 import json
-from urllib.parse import parse_qs, urlparse
-from selenium import webdriver
-from selenium.webdriver.chrome.service import Service
-from selenium.webdriver.chrome.options import Options
+import threading
 import time
 from datetime import datetime
-import threading
+from urllib.parse import parse_qs, urlparse
+
+import requests
+from bs4 import BeautifulSoup
+from selenium import webdriver
+from selenium.webdriver.chrome.options import Options
+from selenium.webdriver.chrome.service import Service
+
 from .base import BaseScraper
+
 
 class SiteScraper(BaseScraper):
     """
@@ -50,7 +53,7 @@ class SiteScraper(BaseScraper):
                     self._log(f"No video found in {subpage_url}")
                 time.sleep(1) # Rate limiting
             except Exception as e:
-                self._log(f"Error processing {subpage_url}: {str(e)}")
+                self._log(f"Error processing {subpage_url}: {e!s}")
 
         # Sort by date (Oldest First)
         # If date is missing, we might rely on the scraping order (assuming site lists Newest First, so we might reverse)
@@ -91,7 +94,7 @@ class SiteScraper(BaseScraper):
                 page += 1
                 time.sleep(1)
             except Exception as e:
-                self._log(f"Error getting page {page}: {str(e)}")
+                self._log(f"Error getting page {page}: {e!s}")
                 break
         return subpage_links
 

@@ -27,14 +27,15 @@ import re
 import sys
 
 from dotenv import load_dotenv
+
 from src.env_resolver import env_path
 
 REPO = pathlib.Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(REPO))
 load_dotenv(env_path())
 
-from pyrogram import Client                       # noqa: E402
-from pyrogram.errors import FloodWait, MessageNotModified  # noqa: E402
+from pyrogram import Client
+from pyrogram.errors import FloodWait, MessageNotModified
 
 LIMIT = 3700          # visible chars per index post; the hard cap is 4096
 CAPTION_LIMIT = 1024
@@ -207,7 +208,7 @@ def build_plan(entries, msg_of, internal, dup_ids, live_by_title):
         if slot == TAIL_SPARE[-1]:
             plan.append((slot, "text",
                          "<pre>▼ ▼ ▼   T H E   L I B R A R Y   ▼ ▼ ▼</pre>\n"
-                         f"<b>Lesson 001 starts in the next message.</b>"))
+                         "<b>Lesson 001 starts in the next message.</b>"))
         else:
             plan.append((slot, "text", SPARE.format(label="TAIL SPARE", i=i,
                                                     total=len(TAIL_SPARE) - 1)))
@@ -313,9 +314,8 @@ async def main():
 
         if args.preview:
             with open(args.preview, "w") as fh:
-                for mid, kind, body in plan:
-                    fh.write(f"\n{'=' * 70}\nMSG {mid}  [{kind}]  "
-                             f"{len(visible(body))} visible chars\n{'-' * 70}\n{body}\n")
+                fh.writelines(f"\n{'=' * 70}\nMSG {mid}  [{kind}]  "
+                             f"{len(visible(body))} visible chars\n{'-' * 70}\n{body}\n" for mid, kind, body in plan)
             print(f"👁  preview -> {args.preview}")
 
         over = [(mid, len(visible(b))) for mid, k, b in plan

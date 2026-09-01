@@ -3,7 +3,6 @@
 Fix manifest by removing duplicate section headers
 """
 
-import re
 
 manifest_path = '.storage/downloaded_video.txt'
 
@@ -40,5 +39,5 @@ with open(manifest_path, 'w') as f:
     f.writelines(fixed_lines)
 
 print("✅ Manifest fixed!")
-print(f"   Removed duplicate section headers")
+print("   Removed duplicate section headers")
 print(f"   Total lines: {len(fixed_lines)}")

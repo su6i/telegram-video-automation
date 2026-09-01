@@ -10,8 +10,9 @@ import os
 import sys
 
 from dotenv import load_dotenv
-from src.env_resolver import env_path
 from pyrogram import Client
+
+from src.env_resolver import env_path
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 load_dotenv(env_path())

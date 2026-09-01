@@ -1,9 +1,11 @@
-from pyrogram import Client
-from dotenv import load_dotenv
-from src.env_resolver import env_path
 import os
-import sys
 import re
+import sys
+
+from dotenv import load_dotenv
+from pyrogram import Client
+
+from src.env_resolver import env_path
 
 # Add project root to sys.path
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -73,15 +75,14 @@ async def main():
                     "full_caption": caption
                 })
                 video_count += 1
-                if msg.id > latest_id:
-                    latest_id = msg.id
+                latest_id = max(latest_id, msg.id)
 
         # Sort by ID (oldest first) to see the sequence
         messages.sort(key=lambda x: x['id'])
         
         found_numbers = set()
         for m in messages:
-            print(f"{m['id']:<10} | {str(m['date']):<20} | {m['caption']}")
+            print(f"{m['id']:<10} | {m['date']!s:<20} | {m['caption']}")
             # Extract number prefix
             match =  re.search(r'^(\d+)', m['full_caption'])
             if match:

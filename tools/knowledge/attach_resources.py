@@ -27,6 +27,7 @@ from collections import defaultdict
 from pathlib import Path
 
 from dotenv import load_dotenv
+
 from src.env_resolver import env_path as vault_env_path
 
 
@@ -257,7 +258,7 @@ async def run_passes(args, groups, map_data, state, subtitles_by_idx, parts_by_c
                             await asyncio.sleep(args.delay)
                         except Exception as e:
                             print(f"   ❌ Error sending part {i}: {e}")
-                            state[canonical]["errors"].append(f"part {i}: {str(e)}")
+                            state[canonical]["errors"].append(f"part {i}: {e!s}")
                             save()
                             errors += 1
             
@@ -283,7 +284,7 @@ async def run_passes(args, groups, map_data, state, subtitles_by_idx, parts_by_c
                             await asyncio.sleep(args.delay)
                         except Exception as e:
                             print(f"   ❌ Error sending subtitle: {e}")
-                            state[canonical]["errors"].append(f"subtitle: {str(e)}")
+                            state[canonical]["errors"].append(f"subtitle: {e!s}")
                             save()
                             errors += 1
 
@@ -338,7 +339,7 @@ async def run_passes(args, groups, map_data, state, subtitles_by_idx, parts_by_c
                                 await asyncio.sleep(args.delay)
                             except Exception as e:
                                 print(f"   ❌ Error sending note for {dup}: {e}")
-                                state[dup]["errors"].append(f"note: {str(e)}")
+                                state[dup]["errors"].append(f"note: {e!s}")
                                 save()
                                 errors += 1
                                 
@@ -363,7 +364,7 @@ async def run_passes(args, groups, map_data, state, subtitles_by_idx, parts_by_c
                                 await asyncio.sleep(args.delay)
                             except Exception as e:
                                 print(f"   ❌ Error sending subtitle for {dup}: {e}")
-                                state[dup]["errors"].append(f"subtitle: {str(e)}")
+                                state[dup]["errors"].append(f"subtitle: {e!s}")
                                 save()
                                 errors += 1
 
@@ -412,7 +413,7 @@ async def run_passes(args, groups, map_data, state, subtitles_by_idx, parts_by_c
                 await asyncio.sleep(args.delay)
             except Exception as e:
                 print(f"   ❌ Error sending subtitle for {idx}: {e}")
-                state[idx]["errors"].append(f"subtitle: {str(e)}")
+                state[idx]["errors"].append(f"subtitle: {e!s}")
                 save()
                 errors += 1
 
@@ -508,7 +509,7 @@ def main():
     print(f"Subtitles: {total_subs} found, {matched_subs} matched to a map entry")
     
     if missing_in_map:
-        print(f"\n⚠️ Lessons present in files but missing in --map:")
+        print("\n⚠️ Lessons present in files but missing in --map:")
         print(f"   {', '.join(missing_in_map)}")
         
     return 0

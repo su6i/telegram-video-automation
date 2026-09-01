@@ -23,7 +23,7 @@ def _norm_url(url):
     # fallback to relative path without domain
     url = url.replace("https://www.example.com", "")
     url = url.replace("http://www.example.com", "")
-    if url.endswith("/"): url = url[:-1]
+    url = url.removesuffix("/")
     return url
 
 def reconstruct():
@@ -190,8 +190,8 @@ def reconstruct():
     print(f"💾 Writing manifest with {len(videos)} videos...")
     
     with open(MANIFEST_FILE, "w", encoding="utf-8") as f:
-        f.write(f"# Index | Title | URL | Course | Section | Status\n")
-        f.write(f"# RECONSTRUCTED FROM BACKUP + DB\n\n")
+        f.write("# Index | Title | URL | Course | Section | Status\n")
+        f.write("# RECONSTRUCTED FROM BACKUP + DB\n\n")
         
         curr_course = None
         curr_cat = None

@@ -7,7 +7,6 @@ caption back — the table of contents, the message map, the manifest
 alignment — has to look at the header lines, not just the first one.
 """
 import re
-from typing import Optional, Tuple
 
 # LRM/RLM markers the channel captions carry.
 RTL_MARKS_RE = re.compile(r"[\u200e\u200f]")
@@ -16,11 +15,11 @@ RTL_MARKS_RE = re.compile(r"[\u200e\u200f]")
 # open with "NNN - Title", the later ones carry the course and the section on
 # the first two lines and the index only on the third, so anchoring on the
 # first line alone misses most of the channel.
-HEADER_INDEX_RE = re.compile(r'^[\s*_#\[\(]*0*(\d{1,4})\s*[-\u2013\u2014\.\:\|\]\)]\s*', re.M)
+HEADER_INDEX_RE = re.compile(r'^[\s*_#\[\(]*0*(\d{1,4})\s*[-\u2013\u2014\.\:\|\]\)]\s*', re.MULTILINE)
 HEADER_LINES = 3
 
 
-def extract_index_and_title(text: str) -> Tuple[Optional[int], str]:
+def extract_index_and_title(text: str) -> tuple[int | None, str]:
     """Return (lesson number, title) from a caption or a filename.
 
     Searches the header lines rather than only the first one, and takes the

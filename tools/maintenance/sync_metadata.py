@@ -1,6 +1,6 @@
 
-import os
 import json
+import os
 import re
 
 STORAGE_DIR = ".storage"
@@ -148,7 +148,7 @@ def sync():
     with open(CONTENT_FILE, "w", encoding="utf-8") as f:
         json.dump(content, f, indent=2, ensure_ascii=False)
 
-    print(f"✅ Sync Complete!")
+    print("✅ Sync Complete!")
     print(f"   📝 Updated {content_updated} entries in scraped_content.json")
     print(f"   📜 Updated {history_updated} entries in upload_history.json")
 

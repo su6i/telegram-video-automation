@@ -1,9 +1,9 @@
-import os
 import json
+import os
 import re
-import urllib.parse
 import shutil
-from pathlib import Path
+import urllib.parse
+
 from bs4 import BeautifulSoup
 
 STORAGE_DIR = ".storage"
@@ -139,7 +139,7 @@ def patch_all_lessons():
     
     # CRITICAL: CLEAR PROXY DIR TO REMOVE STALE GHOST SYMLINKS
     if os.path.exists(v_proxy_abs):
-        print(f"🧹 Clearing stale proxy links...")
+        print("🧹 Clearing stale proxy links...")
         shutil.rmtree(v_proxy_abs)
     os.makedirs(v_proxy_abs, exist_ok=True)
     

@@ -5,7 +5,7 @@ from pathlib import Path
 
 sys.path.append(str(Path(__file__).resolve().parents[1] / "tools" / "knowledge"))
 
-from attach_resources import compression_for  # noqa: E402
+from attach_resources import compression_for
 
 
 def test_precompressed_media_is_stored():

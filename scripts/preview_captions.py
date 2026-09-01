@@ -16,7 +16,7 @@ import sys
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from src.caption_builder import build_caption, CAPTION_LIMIT
+from src.caption_builder import CAPTION_LIMIT, build_caption
 
 REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 os.chdir(REPO_ROOT)

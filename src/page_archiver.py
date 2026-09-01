@@ -1,14 +1,12 @@
 """
 Page archiver — save web pages locally with all assets (images, scripts, styles, etc.)
 """
-import os
 import json
+import os
+from urllib.parse import urljoin, urlparse
+
 import requests
 from bs4 import BeautifulSoup
-from urllib.parse import urljoin, urlparse
-import mimetypes
-from pathlib import Path
-
 
 STORAGE_DIR = ".storage"
 ARCHIVE_DIR = os.path.join(STORAGE_DIR, "page_archives")

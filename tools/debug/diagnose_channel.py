@@ -1,8 +1,10 @@
-from pyrogram import Client
-from dotenv import load_dotenv
-from src.env_resolver import env_path
 import os
 import sys
+
+from dotenv import load_dotenv
+from pyrogram import Client
+
+from src.env_resolver import env_path
 
 # Add project root to sys.path
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -42,7 +44,7 @@ async def main():
             print(f"❌ Could not access target directly: {e}")
             
         # 2. List all dialogs to help user find the real ID
-        print(f"\n📋 Listing joined channels/groups (Last 20):")
+        print("\n📋 Listing joined channels/groups (Last 20):")
         count = 0
         async for dialog in app.get_dialogs(limit=20):
             chat = dialog.chat
@@ -54,12 +56,12 @@ async def main():
             print("   (No channels or groups found)")
 
         # 3. Magic ID Finder (Forward check)
-        print(f"\n🕵️ Magic ID Finder:")
+        print("\n🕵️ Magic ID Finder:")
         print("   Checking your 'Saved Messages' for forwarded posts...")
         try:
             async for msg in app.get_chat_history("me", limit=1):
                 if msg.forward_from_chat:
-                    print(f"   🎉 FOUND FORWARDED MESSAGE!")
+                    print("   🎉 FOUND FORWARDED MESSAGE!")
                     print(f"   From Channel: {msg.forward_from_chat.title}")
                     print(f"   ✅ Real ID: {msg.forward_from_chat.id}")
                     print(f"   (Username: @{msg.forward_from_chat.username})")

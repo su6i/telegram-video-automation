@@ -1,6 +1,8 @@
-import os
 import asyncio
+import os
+
 from dotenv import load_dotenv
+
 from src.env_resolver import env_path
 from src.video_utils import process_video_for_bot_safe
 

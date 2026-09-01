@@ -1,23 +1,22 @@
 # update_captions.py
+import asyncio
+import json
 import os
 import re
 import sys
-import json
-import asyncio
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
-from typing import List, Tuple, Optional, Dict, Any
 
 # Add project root to sys.path so "src.*" resolves when run as a script
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from src.caption_index import extract_index_and_title, safe_extract_number
-
 from dotenv import load_dotenv
-from src.env_resolver import env_path
 from pyrogram import Client
-from pyrogram.errors import RPCError, ChatAdminRequired
 from pyrogram.enums import ChatType, ParseMode
+from pyrogram.errors import ChatAdminRequired, RPCError
+
+from src.caption_index import extract_index_and_title, safe_extract_number
+from src.env_resolver import env_path
 
 # =========================== Env & Config ===========================
 load_dotenv(env_path())
@@ -68,7 +67,7 @@ def clean_caption(caption: str) -> str:
     cleaned = re.sub(r"\s+", " ", cleaned).strip()
     return cleaned
 
-def load_manifest_hierarchy() -> Dict[str, Dict[str, str]]:
+def load_manifest_hierarchy() -> dict[str, dict[str, str]]:
     """Returns {index: {'course': ..., 'section': ...}}"""
     manifest_path = os.path.join(".storage", "downloaded_video.txt")
     if not os.path.exists(manifest_path):
@@ -107,17 +106,17 @@ def create_numbered_caption(number: int, original_caption: str) -> str:
     return f"{RLM}{base}"
 
 # =========================== File time helpers ===========================
-def get_file_timestamp(p: Path) -> Optional[datetime]:
+def get_file_timestamp(p: Path) -> datetime | None:
     try:
         st = p.stat()
         birth = getattr(st, "st_birthtime", None)
         ts = birth if birth else st.st_mtime
-        return datetime.fromtimestamp(ts, tz=timezone.utc)
+        return datetime.fromtimestamp(ts, tz=UTC)
     except Exception:
         return None
 
-def load_video_files_sorted(video_dir: Optional[str]) -> List[Tuple[Path, datetime]]:
-    result: List[Tuple[Path, datetime]] = []
+def load_video_files_sorted(video_dir: str | None) -> list[tuple[Path, datetime]]:
+    result: list[tuple[Path, datetime]] = []
     if not video_dir:
         print("🗂️ VIDEO_DIR not set.")
         return result
@@ -150,7 +149,7 @@ def is_channel_like(t) -> bool:
     except Exception:
         return str(t).lower() in ("chattype.channel", "chattype.supergroup", "channel", "supergroup")
 
-async def resolve_channel(app: Client) -> Tuple[Optional[int], Optional[str]]:
+async def resolve_channel(app: Client) -> tuple[int | None, str | None]:
     # 1) CHANNEL_ID
     if CHANNEL_ID_ENV:
         cid = int(CHANNEL_ID_ENV)
@@ -259,7 +258,7 @@ async def get_all_videos_info(app: Client, chat_id: int):
             videos.append({
                 "message_id": m.id,
                 "caption": m.caption or "",
-                "date": m.date if (m.date and m.date.tzinfo) else (m.date.replace(tzinfo=timezone.utc) if m.date else None),
+                "date": m.date if (m.date and m.date.tzinfo) else (m.date.replace(tzinfo=UTC) if m.date else None),
             })
     print(f"✅ Total messages checked: {checked} | Videos: {len(videos)}")
     return videos
@@ -269,7 +268,7 @@ async def save_backup(videos, filename="backup_captions.json"):
         payload = [{
             "message_id": v["message_id"],
             "caption": v["caption"],
-            "date": v["date"].astimezone(timezone.utc).isoformat() if isinstance(v["date"], datetime) else None
+            "date": v["date"].astimezone(UTC).isoformat() if isinstance(v["date"], datetime) else None
         } for v in videos]
         with open(filename, "w", encoding="utf-8") as f:
             json.dump(payload, f, ensure_ascii=False, indent=2)
@@ -277,9 +276,9 @@ async def save_backup(videos, filename="backup_captions.json"):
     except Exception as e:
         print(f"⚠️ Error saving backup: {e}")
 
-def plan_numbering_by_files(videos, files_sorted: List[Tuple[Path, datetime]]):
+def plan_numbering_by_files(videos, files_sorted: list[tuple[Path, datetime]]):
     if files_sorted and len(files_sorted) == len(videos):
-        videos_sorted_by_msg_date = sorted(videos, key=lambda x: x["date"] or datetime(1970,1,1,tzinfo=timezone.utc))
+        videos_sorted_by_msg_date = sorted(videos, key=lambda x: x["date"] or datetime(1970,1,1,tzinfo=UTC))
         planned = []
         hierarchy = load_manifest_hierarchy()
         for i, v in enumerate(videos_sorted_by_msg_date, start=1):
@@ -299,7 +298,7 @@ def plan_numbering_by_files(videos, files_sorted: List[Tuple[Path, datetime]]):
         return planned
     else:
         planned = []
-        videos_sorted = sorted(videos, key=lambda x: x["date"] or datetime(1970,1,1,tzinfo=timezone.utc))
+        videos_sorted = sorted(videos, key=lambda x: x["date"] or datetime(1970,1,1,tzinfo=UTC))
         hierarchy = load_manifest_hierarchy()
         for i, v in enumerate(videos_sorted, start=1):
             # Try to match a file by number
@@ -379,7 +378,7 @@ async def create_index_posts(app: Client, chat_id: int, planned, title="📚 Vid
     if len(courses) == 1:
         header = f"{LRM}<b>🎓 {courses.pop()}</b>\n"
 
-    chunk_lines: List[str] = []
+    chunk_lines: list[str] = []
     chunk_len = len(header)
 
     last_course = None
@@ -475,7 +474,7 @@ async def create_index_posts(app: Client, chat_id: int, planned, title="📚 Vid
             # No more placeholders, send as new
             overflowed += 1
             if dry_run:
-                print(f"   🆕 Would send new Index Post (Dry Run)")
+                print("   🆕 Would send new Index Post (Dry Run)")
                 # Increment index so we don't spam "would send" too much? No, it's fine.
                 placeholder_idx += 1 
             else:
@@ -572,7 +571,7 @@ def dedupe_by_lesson(videos):
     return list(best.values())
 
 
-def plan_from_existing(videos, files_sorted: List[Tuple[Path, datetime]] = None):
+def plan_from_existing(videos, files_sorted: list[tuple[Path, datetime]] = None):
     # Uses existing numbers in captions; no changes made to captions.
     vids_sorted = sorted(dedupe_by_lesson(videos),
                          key=lambda v: safe_extract_number(v.get("caption", "")))
@@ -602,7 +601,7 @@ def plan_from_existing(videos, files_sorted: List[Tuple[Path, datetime]] = None)
             "section": h.get("section")
         })
     
-    print(f"📋 Videos sorted by existing numbering:")
+    print("📋 Videos sorted by existing numbering:")
     return planned
 
 

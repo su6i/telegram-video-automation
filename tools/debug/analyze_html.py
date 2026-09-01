@@ -1,5 +1,5 @@
+
 from bs4 import BeautifulSoup
-import sys
 
 try:
     with open("debug_course_source.html", "r", encoding="utf-8") as f:

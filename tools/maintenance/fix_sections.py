@@ -3,8 +3,6 @@
 Fix manifest sections by grouping consecutive videos with similar patterns
 """
 
-import re
-from collections import Counter
 
 manifest_path = '.storage/downloaded_video.txt'
 

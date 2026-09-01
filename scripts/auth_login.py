@@ -1,8 +1,10 @@
-from pyrogram import Client
-from dotenv import load_dotenv
-from src.env_resolver import env_path
 import os
 import sys
+
+from dotenv import load_dotenv
+from pyrogram import Client
+
+from src.env_resolver import env_path
 
 # Add project root to sys.path
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -27,7 +29,7 @@ print("🚀 Attempting to connect...")
 app.start()
 
 me = app.get_me()
-print(f"✅ Login Successful!")
+print("✅ Login Successful!")
 print(f"👤 User: {me.first_name} {me.last_name or ''} (@{me.username})")
 print(f"📱 Phone: {me.phone_number}")
 

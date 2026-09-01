@@ -81,9 +81,7 @@ def format_description_markdown(text):
         # Additional detection for unprotected lines
         if not is_header:
             # DON'T treat list items as headers even if Title Cased
-            if re.match(r'^(\d+\.|[\-•·*]|->|=>|\.)\s+', stripped):
-                is_header = False
-            elif stripped in EXCLUDED_WORDS:
+            if re.match(r'^(\d+\.|[\-•·*]|->|=>|\.)\s+', stripped) or stripped in EXCLUDED_WORDS:
                 is_header = False
             elif re.search(r'^(EXTREMELY\s+)?(IMPORTANT|NOTE|TIP|WARNING|RECAP|HOW TO)\b', stripped.upper()):
                 is_header = True

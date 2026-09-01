@@ -3,8 +3,6 @@ Manifest manager — track video processing and upload status in downloaded_vide
 """
 import os
 import re
-from pathlib import Path
-
 
 STORAGE_DIR = ".storage"
 MANIFEST_FILE = os.path.join(STORAGE_DIR, "downloaded_video.txt")
