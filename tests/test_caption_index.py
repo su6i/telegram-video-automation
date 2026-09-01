@@ -65,7 +65,7 @@ def test_a_reuploaded_lesson_appears_once_in_the_index():
     # The module needs .env credentials at import time, so pull the helper out
     # of the source instead of importing the whole script.
     src = spec.origin
-    text = open(src, encoding="utf-8").read()
+    text = P(src).read_text(encoding="utf-8")
     start = text.index("def dedupe_by_lesson(")
     end = text.index("def plan_from_existing(")
     ns = {"safe_extract_number": safe_extract_number}

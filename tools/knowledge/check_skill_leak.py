@@ -73,7 +73,7 @@ def manifest_terms(manifest_path):
     terms = set()
     if not os.path.exists(manifest_path):
         return terms
-    for line in open(manifest_path, encoding="utf-8"):
+    for line in Path(manifest_path).read_text(encoding="utf-8").splitlines():
         line = line.strip()
         if line.startswith("# === "):
             terms.add(line[6:].split(" ===")[0].split("(")[0].strip())
@@ -110,7 +110,7 @@ def build_banned(terms, extra_path=None):
         if len(toks) > 1 or len(norm) >= MIN_TERM_LEN and norm not in STOPWORDS:
             phrases.add(norm)
     if extra_path and os.path.exists(extra_path):
-        for line in open(extra_path, encoding="utf-8"):
+        for line in Path(extra_path).read_text(encoding="utf-8").splitlines():
             line = line.split("#")[0].strip()
             if line:
                 phrases.add(normalize(line))
