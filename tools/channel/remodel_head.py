@@ -127,7 +127,16 @@ def read_manifest():
     return out
 
 
-def build_index(entries, msg_of, internal):
+def resource_and_subtitle_ids(entry):
+    """(resource_msg_id_or_None, subtitle_msg_id_or_None) for one lesson."""
+    if not entry:
+        return None, None
+    parts = entry.get("pack_parts") or {}
+    resource_id = parts[sorted(parts, key=int)[0]] if parts else entry.get("duplicate_note")
+    return resource_id, entry.get("subtitle")
+
+
+def build_index(entries, msg_of, internal, attach_state):
     posts, lines, vis = [], [], 0
     cur_course = cur_section = None
 
@@ -165,9 +174,15 @@ def build_index(entries, msg_of, internal):
             add("", 0)
             add(f"<b>📁 {html.escape(s)}</b>", len(s) + 3)
         mid = msg_of.get(num)
-        body = (f'<a href="https://t.me/c/{internal}/{mid}">{num}</a> · {html.escape(title)}'
-                if mid else f"{num} · {html.escape(title)}")
-        add(body, len(num) + 3 + len(title))
+        resource_id, subtitle_id = resource_and_subtitle_ids(attach_state.get(num))
+        extra = ""
+        if resource_id:
+            extra += f' <a href="https://t.me/c/{internal}/{resource_id}">📎</a>'
+        if subtitle_id:
+            extra += f' <a href="https://t.me/c/{internal}/{subtitle_id}">📝</a>'
+        body = (f'<a href="https://t.me/c/{internal}/{mid}">{num}</a>{extra} · {html.escape(title)}'
+                if mid else f"{num}{extra} · {html.escape(title)}")
+        add(body, len(num) + 3 + len(title) + len(visible(extra)))
     close()
     return posts
 
@@ -177,9 +192,9 @@ def visible(s):
 
 
 # --- the plan ---------------------------------------------------------------
-def build_plan(entries, msg_of, internal, dup_ids, live_by_title):
+def build_plan(entries, msg_of, internal, dup_ids, live_by_title, attach_state):
     n, c = len(entries), len({e[0] for e in entries})
-    posts = build_index(entries, msg_of, internal)
+    posts = build_index(entries, msg_of, internal, attach_state)
     if len(posts) > len(INDEX_SLOTS):
         raise SystemExit(
             f"index needs {len(posts)} posts but only {len(INDEX_SLOTS)} slots are "
@@ -275,6 +290,7 @@ async def main():
     internal = abs(chat_id) - 1000000000000
 
     mp = json.load(open(data / "message_ids.json"))
+    attach_state = json.load(open(data / "attachments_state.json"))
     msg_of = {k: (v if isinstance(v, int) else v.get("video")) for k, v in mp.items()}
     entries = read_manifest()
     live_by_title = {t: msg_of.get(num) for _, _, num, t in entries}
@@ -300,7 +316,7 @@ async def main():
                 # live lesson, which is the confusion this pass exists to end.
                 dup_ids[m.id] = duplicate_title(cap, set(live_by_title))
 
-        plan = build_plan(entries, msg_of, internal, dup_ids, live_by_title)
+        plan = build_plan(entries, msg_of, internal, dup_ids, live_by_title, attach_state)
 
         touched = [mid for mid, _, _ in plan if mid not in backup]
         for i in range(0, len(touched), 100):
