@@ -3,6 +3,18 @@
 ## Unreleased
 
 ### Fixed
+- `tools/channel/remodel_head.py` could not start at all: `from
+  src.env_resolver import env_path` sat *above* the `sys.path.insert(REPO)`
+  that makes `src` importable, so the documented invocation
+  (`uv run --directory <repo> tools/channel/remodel_head.py ...`) died with
+  `ModuleNotFoundError: No module named 'src'` — running a file in a
+  subdirectory as a script puts that subdirectory on `sys.path`, never the repo
+  root. Introduced by the `.env` vault migration (WO-TVA-0002), which added the
+  import at the top of the file; the test suite never caught it because tests
+  import the module through `conftest.py`'s path bootstrap. Moved the bootstrap
+  above the import. **The same latent break exists in 16 other subdirectory
+  entry points** under `scripts/` and `tools/` (`main.py` is fine — it sits at
+  the repo root); see T-936. (T-935)
 - `pytest` is now a warning gate: `pytest.ini` gets `filterwarnings = error`
   plus a single documented ignore for pyrogram 2.0.106's
   `asyncio.get_event_loop()` DeprecationWarning (raised at import time in

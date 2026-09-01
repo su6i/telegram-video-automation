@@ -28,10 +28,13 @@ import sys
 
 from dotenv import load_dotenv
 
-from src.env_resolver import env_path
-
+# The repo root has to be on sys.path before anything under src/ is imported —
+# running this file as a script puts tools/channel/ on sys.path, not the root.
 REPO = pathlib.Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(REPO))
+
+from src.env_resolver import env_path
+
 load_dotenv(env_path())
 
 from pyrogram import Client
