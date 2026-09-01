@@ -28,6 +28,7 @@ sys.path.append(str(Path(__file__).resolve().parents[2]))
 from src.caption_index import extract_index_and_title
 
 from dotenv import load_dotenv
+from src.env_resolver import env_path as vault_env_path
 from pyrogram import Client
 
 
@@ -112,7 +113,7 @@ def main():
                                     "(default: backup_captions.json next to --out)")
     ap.add_argument("--manifest", default=".storage/downloaded_video.txt")
     ap.add_argument("--out", required=True, help="where to write message_ids.json")
-    ap.add_argument("--env", default=".env")
+    ap.add_argument("--env", default=str(vault_env_path()))
     ap.add_argument("--workdir", default=".")
     
     args = ap.parse_args()

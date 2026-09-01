@@ -1,9 +1,10 @@
 import os
 import asyncio
 from dotenv import load_dotenv
+from src.env_resolver import env_path
 from src.video_utils import process_video_for_user_safe, get_smart_title
 
-load_dotenv()
+load_dotenv(env_path())
 # Config
 video_dir = "downloads"
 output_dir = "processed"

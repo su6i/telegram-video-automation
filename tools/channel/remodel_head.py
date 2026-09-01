@@ -27,10 +27,11 @@ import re
 import sys
 
 from dotenv import load_dotenv
+from src.env_resolver import env_path
 
 REPO = pathlib.Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(REPO))
-load_dotenv(REPO / ".env")
+load_dotenv(env_path())
 
 from pyrogram import Client                       # noqa: E402
 from pyrogram.errors import FloodWait, MessageNotModified  # noqa: E402

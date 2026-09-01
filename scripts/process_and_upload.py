@@ -11,6 +11,7 @@ import logging
 from pathlib import Path
 from datetime import datetime
 from dotenv import load_dotenv
+from src.env_resolver import env_path
 
 # Progress bar removed to restore detailed output
 HAS_TQDM = False
@@ -48,7 +49,7 @@ from src.caption_builder import build_caption, validate_caption
 
 # Load environment variables
 root_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-load_dotenv(os.path.join(root_dir, ".env"))
+load_dotenv(env_path())
 
 # Bot Config
 telegram_token = os.getenv("TELEGRAM_TOKEN")

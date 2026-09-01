@@ -1,4 +1,3 @@
-
 import time
 import json
 import os
@@ -8,8 +7,9 @@ from selenium.webdriver.chrome.service import Service
 from selenium.webdriver.chrome.options import Options
 from webdriver_manager.chrome import ChromeDriverManager
 from dotenv import load_dotenv
+from src.env_resolver import env_path
 
-load_dotenv()
+load_dotenv(env_path())
 
 # Configuration
 COOKIE_FILE = "auth_cookies.json"

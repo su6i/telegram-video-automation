@@ -11,7 +11,7 @@
    ```bash
    pip install -r requirements.txt
    ```
-3. **Configure Environment:** Create a `.env` file with your credentials (API_ID, API_HASH, etc.).
+3. **Configure Environment:** Copy `.env.example` to `.env`, fill in real values, and place the real file in the vault at `~/.local/share/agent-projects/telegram-video-automation/secrets/.env` rather than the repo root.
 
 ## 🚀 The 3-Step Pipeline
 

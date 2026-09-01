@@ -29,6 +29,7 @@ from pathlib import Path
 sys.path.append(str(Path(__file__).resolve().parents[2]))
 
 from dotenv import load_dotenv
+from src.env_resolver import env_path as vault_env_path
 
 # Telegram's caption limit, in characters of plain text.
 CAPTION_LIMIT = 1024
@@ -186,7 +187,7 @@ def main():
                     help="restrict the run to these lesson indexes (repeatable)")
     ap.add_argument("--delay", type=float, default=1.5,
                     help="seconds between edits; the channel rate limit is per-minute")
-    ap.add_argument("--env", default=".env")
+    ap.add_argument("--env", default=str(vault_env_path()))
     ap.add_argument("--workdir", default=".")
     g = ap.add_mutually_exclusive_group()
     g.add_argument("--dry-run", action="store_true", help="print the plan only (default)")
