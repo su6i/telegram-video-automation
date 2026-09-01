@@ -2,24 +2,32 @@ from PIL import Image, ImageDraw, ImageFont
 import textwrap
 import os
 
-title = "Python Basics Introduction"
-font_path = "src/fonts/Vazir-Bold.ttf"
-width, height = 1920, 1080
-background_color = (0, 0, 0)
-text_color = (255, 255, 255)
+def test_preview_generation(tmp_path):
+    title = "Python Basics Introduction"
+    font_path = "src/fonts/Vazir-Bold.ttf"
+    width, height = 1920, 1080
+    background_color = (0, 0, 0)
+    text_color = (255, 255, 255)
 
-img = Image.new('RGB', (width, height), color=background_color)
-draw = ImageDraw.Draw(img)
+    img = Image.new('RGB', (width, height), color=background_color)
+    draw = ImageDraw.Draw(img)
 
-try:
-    font = ImageFont.truetype(font_path, 120)
-except:
-    font = ImageFont.load_default()
+    try:
+        font = ImageFont.truetype(font_path, 120)
+    except:
+        font = ImageFont.load_default()
 
-text_width = draw.textlength(title, font=font)
-current_x = (width - text_width) // 2
-current_y = (height - 180) // 2
+    text_width = draw.textlength(title, font=font)
+    current_x = (width - text_width) // 2
+    current_y = (height - 180) // 2
 
-draw.text((current_x, current_y), title, font=font, fill=text_color)
-img.save("title_preview.png")
-print("Title preview saved to title_preview.png")
+    draw.text((current_x, current_y), title, font=font, fill=text_color)
+    
+    assert img.size == (1920, 1080)
+    assert img.mode == "RGB"
+    
+    out_path = tmp_path / "title_preview.png"
+    img.save(out_path)
+    
+    assert out_path.exists()
+    assert out_path.stat().st_size > 0

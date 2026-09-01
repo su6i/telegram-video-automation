@@ -48,3 +48,4 @@ failed_downloads.txt
 
 # media blobs live in the vault, not in git (rule 035)
 demo/demo_recording.webp
+title_preview.png
