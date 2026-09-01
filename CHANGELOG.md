@@ -21,6 +21,7 @@
   `.gitignore`. (T-932)
 
 ### Added
+- The channel index (`build_index` in `tools/channel/remodel_head.py`) now also links each lesson's resources (📎) and subtitles (📝) next to the lesson number. It reuses the same `pack_parts` → `duplicate_note` → `subtitle` precedence that `tools/knowledge/link_captions.py` already uses for the caption link. The links are sourced from `data/attachments_state.json`.
 - `ruff` added as a dev dependency (`[dependency-groups] dev`) with a minimal
   `[tool.ruff]` section (no custom rule overrides — plain ruff defaults) to
   give this repo its first lint gate. Ran `ruff check --fix .` and committed
