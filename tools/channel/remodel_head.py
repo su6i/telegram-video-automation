@@ -7,8 +7,7 @@ re-purposed:
 
     2      banner        the channel's name, as block art
     3      about         what the channel is, and how to use it
-    4-7    index         the full table of contents, one post per chunk
-    8-11   head spare    labelled, empty, reserved for index growth
+    4-11   index         the full table of contents, one post per chunk
     111-125  divider     art + a signpost, in the middle of the old duplicates
     291-305  tail spare  reserved, immediately above the library
     others   duplicates  old uploads: caption rewritten to point at the live
@@ -40,14 +39,22 @@ load_dotenv(env_path())
 from pyrogram import Client
 from pyrogram.errors import FloodWait, MessageNotModified
 
-LIMIT = 3700          # visible chars per index post; the hard cap is 4096
+LIMIT = 3700           # visible chars per index post, in UTF-16 units (see
+                       # utf16_len below); the hard cap is 4096.
+ENT_LIMIT = 100        # Telegram's hard per-message entity cap (<a>, <b>, ...).
+                       # Exceed it and the excess entities are silently
+                       # dropped -- the text still renders, but the links
+                       # past #100 go dead with no error and no truncation
+                       # marker. 100 is the only value that fits the index
+                       # into the 8 reserved INDEX_SLOTS: ENT_LIMIT = 95
+                       # needs 9 posts, which doesn't fit. Do not raise it.
 CAPTION_LIMIT = 1024
 
 # --- slots ------------------------------------------------------------------
 BANNER_SLOT = 2
 ABOUT_SLOT = 3
-INDEX_SLOTS = [4, 5, 6, 7]
-HEAD_SPARE = [8, 9, 10, 11]
+INDEX_SLOTS = [4, 5, 6, 7, 8, 9, 10, 11]   # was [4,5,6,7]; absorbed HEAD_SPARE
+HEAD_SPARE = []                             # exhausted -- see build_plan()'s guard
 DIVIDER_SLOTS = list(range(111, 126))
 TAIL_SPARE = list(range(291, 306))
 
@@ -74,12 +81,12 @@ tap it and you land on that lesson's video.
 <b>🎬 Each lesson</b> carries its description in the caption. Long descriptions
 continue in the reply right underneath.
 
-<b>📎 Resources and 📝 subtitles</b> live further down the channel; the link at
+<b>📎 Resources and CC subtitles</b> live further down the channel; the link at
 the bottom of each video's caption jumps straight to them.
 
-<b>🔖 The posts above and below the index are reserved.</b> They are kept empty
-on purpose, so a new lesson can be added to the index without deleting
-anything. Please do not ask for them to be removed.
+<b>🔖 The posts below the index are reserved.</b> They are kept empty on
+purpose, so the index can grow without deleting anything. Please do not ask
+for them to be removed.
 
 <i>📌 Pin: the first index post.</i>"""
 
@@ -140,58 +147,82 @@ def resource_and_subtitle_ids(entry):
 
 
 def build_index(entries, msg_of, internal, attach_state):
-    posts, lines, vis = [], [], 0
+    posts, lines, vis, ent = [], [], 0, 0
     cur_course = cur_section = None
 
     def close():
-        nonlocal lines, vis
+        nonlocal lines, vis, ent
         if lines:
             posts.append("\n".join(lines))
-            lines, vis = [], 0
+            lines, vis, ent = [], 0, 0
 
-    def add(h, v):
-        nonlocal vis
+    def add(h, v, e=0):
+        nonlocal vis, ent
         lines.append(h)
         vis += v + 1
+        ent += e
 
     for c, s, num, title in entries:
         new_course, new_section = c != cur_course, s != cur_section
-        cost = len(num) + 4 + len(title)
-        cost += (len(c) + 5) if new_course else 0
-        cost += (len(s) + 5) if new_section else 0
-        if vis + cost > LIMIT and lines:
+        cost = utf16_len(num) + 4 + utf16_len(title)
+        cost += (utf16_len(c) + 5) if new_course else 0
+        cost += (utf16_len(s) + 5) if new_section else 0
+
+        mid = msg_of.get(num)
+        resource_id, subtitle_id = resource_and_subtitle_ids(attach_state.get(num))
+        # Entities this line would add if it lands in the *current* post:
+        # 1 for the lesson-number link (0 if there's no mid -- plain text
+        # costs nothing), +1 per resource/subtitle link, +1 per course/
+        # section header this line would trigger.
+        cost_ent = (1 if mid else 0) + (1 if resource_id else 0) + (1 if subtitle_id else 0)
+        # A new course forces a section header too, even when the section
+        # name is unchanged across the boundary — charge both, or the
+        # prediction under-counts by 1 and the post lands at 101 entities.
+        cost_ent += (1 if new_course else 0) + (1 if (new_section or new_course) else 0)
+
+        if lines and (vis + cost > LIMIT or ent + cost_ent > ENT_LIMIT):
             close()
             cur_course, cur_section = c, s
-            add(f"<b>🎓 {html.escape(c)} (continued)</b>", len(c) + 15)
+            # The (continued) header pair itself costs 2 entities (1 per
+            # <b>) -- charge it through add()'s `e` argument, or the count
+            # drifts and the split feeds back on itself.
+            add(f"<b>🎓 {html.escape(c)} (continued)</b>", utf16_len(c) + 15, 1)
             add("", 0)
-            add(f"<b>📁 {html.escape(s)}</b>", len(s) + 3)
+            add(f"<b>📁 {html.escape(s)}</b>", utf16_len(s) + 3, 1)
             new_course = new_section = False
         if new_course:
             if lines:
                 add("", 0)
             cur_course, cur_section = c, None
-            add(f"<b>🎓 {html.escape(c)}</b>", len(c) + 3)
+            add(f"<b>🎓 {html.escape(c)}</b>", utf16_len(c) + 3, 1)
             new_section = True
         if new_section:
             cur_section = s
             add("", 0)
-            add(f"<b>📁 {html.escape(s)}</b>", len(s) + 3)
-        mid = msg_of.get(num)
-        resource_id, subtitle_id = resource_and_subtitle_ids(attach_state.get(num))
+            add(f"<b>📁 {html.escape(s)}</b>", utf16_len(s) + 3, 1)
         extra = ""
         if resource_id:
             extra += f' <a href="https://t.me/c/{internal}/{resource_id}">📎</a>'
         if subtitle_id:
-            extra += f' <a href="https://t.me/c/{internal}/{subtitle_id}">📝</a>'
+            extra += f' <a href="https://t.me/c/{internal}/{subtitle_id}">CC</a>'
         body = (f'<a href="https://t.me/c/{internal}/{mid}">{num}</a>{extra} · {html.escape(title)}'
                 if mid else f"{num}{extra} · {html.escape(title)}")
-        add(body, len(num) + 3 + len(title) + len(visible(extra)))
+        body_ent = (1 if mid else 0) + (1 if resource_id else 0) + (1 if subtitle_id else 0)
+        add(body, utf16_len(num) + 3 + utf16_len(title) + utf16_len(visible(extra)), body_ent)
     close()
     return posts
 
 
 def visible(s):
     return re.sub(r"<[^>]+>", "", s)
+
+
+def utf16_len(s):
+    """Telegram's char caps (LIMIT, 4096, CAPTION_LIMIT) count UTF-16 code
+    units, not Python characters -- every emoji costs 2 there and 1 in
+    Python's len(). Use this everywhere cost arithmetic touches text that
+    might contain non-BMP characters."""
+    return len(s.encode("utf-16-le")) // 2
 
 
 # --- the plan ---------------------------------------------------------------
@@ -201,7 +232,10 @@ def build_plan(entries, msg_of, internal, dup_ids, live_by_title, attach_state):
     if len(posts) > len(INDEX_SLOTS):
         raise SystemExit(
             f"index needs {len(posts)} posts but only {len(INDEX_SLOTS)} slots are "
-            f"reserved — widen INDEX_SLOTS (take them from HEAD_SPARE) and re-run")
+            f"reserved — HEAD_SPARE is exhausted (it was absorbed into INDEX_SLOTS "
+            f"to fit the entity-aware split, see T-937). Reclaiming ids 12-64 is "
+            f"possible but needs an owner decision plus a live read of what those "
+            f"messages currently are; that's out of scope here. See TODO.md.")
 
     plan = []
     plan.append((BANNER_SLOT, "text", BANNER.format(n=n, c=c)))
@@ -339,8 +373,8 @@ async def main():
                              f"{len(visible(body))} visible chars\n{'-' * 70}\n{body}\n" for mid, kind, body in plan)
             print(f"👁  preview -> {args.preview}")
 
-        over = [(mid, len(visible(b))) for mid, k, b in plan
-                if len(visible(b)) > (CAPTION_LIMIT if k == "caption" else 4096)]
+        over = [(mid, utf16_len(visible(b))) for mid, k, b in plan
+                if utf16_len(visible(b)) > (CAPTION_LIMIT if k == "caption" else 4096)]
         if over:
             raise SystemExit(f"❌ {len(over)} message(s) exceed the limit: {over[:5]}")
 

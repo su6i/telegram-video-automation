@@ -3,6 +3,35 @@
 ## Unreleased
 
 ### Fixed
+- `build_index()` (`tools/channel/remodel_head.py`) chunked the channel
+  index on visible characters only (`LIMIT = 3700`), never on Telegram's
+  hard 100-entity-per-message cap. WO-TVA-0006 tripled entities per lesson
+  line (number + 📎 resource + subtitle) without updating the chunker, so
+  307 of the index's 707 `<a>`/`<b>` entities were silently dropped by
+  Telegram past the 100th per post — the links rendered as dead plain text
+  with no error. Added an entity counter alongside the char counter and
+  close the post when either budget would be exceeded (`ENT_LIMIT = 100`,
+  Telegram's hard cap; do not raise it). `INDEX_SLOTS` widened from
+  `[4,5,6,7]` to `[4..11]`, absorbing the now-exhausted `HEAD_SPARE`
+  (`[]`) — 100 is the only `ENT_LIMIT` value that fits the split into 8
+  slots (95 needs 9). Also switched the char budget to UTF-16 code units
+  (`len(s.encode("utf-16-le")) // 2`), since Telegram's 4096 cap counts
+  those, not Python `len()` — never bit in practice (today's max post is
+  under 2100 code units) but the old margin was smaller than it looked.
+  Subtitle glyph 📝 -> `CC` in `remodel_head.py` only (`link_captions.py`
+  and `attach_resources.py` keep 📝; the 283 live captions aren't being
+  re-captioned in this pass, so a temporary mismatch there is expected).
+  After the fix the index is 8 posts carrying all 663 links (283 video +
+  97 resource + 283 subtitle), entities per post
+  `[99, 99, 100, 99, 100, 100, 100, 19]` — three posts sit at exactly the
+  cap, so there is no headroom left on either axis. One more lesson needs
+  a ninth slot and `build_plan()` will hard-fail by design; see `TODO.md`.
+  Because the margin is zero, the pre-split entity prediction also had to
+  stop under-counting: a course change emits a section header too, even
+  when the section name is unchanged across the boundary, and charging
+  only for the course header there put the post at 101 entities — one
+  silently dead link. Covered by
+  `test_index_entity_cap_holds_across_a_course_boundary`. (T-937)
 - `tools/channel/remodel_head.py` could not start at all: `from
   src.env_resolver import env_path` sat *above* the `sys.path.insert(REPO)`
   that makes `src` importable, so the documented invocation
