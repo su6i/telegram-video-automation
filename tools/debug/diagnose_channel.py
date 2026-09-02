@@ -1,13 +1,16 @@
 import os
+import pathlib
 import sys
 
 from dotenv import load_dotenv
 from pyrogram import Client
 
-from src.env_resolver import env_path
+# The repo root has to be on sys.path before anything under src/ is imported —
+# running this file as a script puts tools/debug/ on sys.path, not the root.
+REPO = pathlib.Path(__file__).resolve().parents[2]
+sys.path.insert(0, str(REPO))
 
-# Add project root to sys.path
-sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+from src.env_resolver import env_path
 
 # Load from root .env
 root_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))

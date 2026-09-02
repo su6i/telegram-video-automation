@@ -12,9 +12,13 @@ import sys
 from dotenv import load_dotenv
 from pyrogram import Client
 
+# The repo root has to be on sys.path before anything under src/ is imported —
+# running this file as a script puts scripts/ on sys.path, not the root.
+ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+sys.path.insert(0, ROOT)
+
 from src.env_resolver import env_path
 
-ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 load_dotenv(env_path())
 
 api_id = os.getenv("API_ID")

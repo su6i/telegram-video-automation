@@ -1,6 +1,8 @@
 import argparse
 import asyncio
+import json
 import os
+import pathlib
 import re
 import sys
 
@@ -8,13 +10,12 @@ from dotenv import load_dotenv
 from pyrogram import Client, enums
 from pyrogram.types import InputMediaVideo
 
+# The repo root has to be on sys.path before anything under src/ is imported —
+# running this file as a script puts scripts/ on sys.path, not the root.
+REPO = pathlib.Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(REPO))
+
 from src.env_resolver import env_path
-
-# Add project root to path
-sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-
-import json
-
 from src.media_resolver import list_all_videos
 from src.video_utils import get_smart_title
 from src.video_utils import process_video_for_user_safe as process_video_for_user
