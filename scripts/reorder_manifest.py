@@ -1,8 +1,11 @@
 import os
+import pathlib
 import sys
 
-# Add project root to sys.path
-sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+# The repo root has to be on sys.path before anything under src/ is imported —
+# running this file as a script puts scripts/ on sys.path, not the root.
+REPO = pathlib.Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(REPO))
 
 from src.manifest_manager import ManifestManager
 

@@ -12,9 +12,25 @@
   root. Introduced by the `.env` vault migration (WO-TVA-0002), which added the
   import at the top of the file; the test suite never caught it because tests
   import the module through `conftest.py`'s path bootstrap. Moved the bootstrap
-  above the import. **The same latent break exists in 16 other subdirectory
+  above the import. **The same latent break exists in 26 other subdirectory
   entry points** under `scripts/` and `tools/` (`main.py` is fine — it sits at
   the repo root); see T-936. (T-935)
+- T-936: the same `sys.path` bootstrap bug fixed in `remodel_head.py` (T-935)
+  existed in all 26 other entry points under `scripts/` and `tools/` — either
+  the bootstrap was missing entirely, ordered after the first `from src...`
+  import, or (in `tools/knowledge/*.py`) present as `sys.path.append(...)`
+  instead of `sys.path.insert(0, ...)`, which happened to work but didn't
+  match the fix pattern the new regression test enforces. Fixed all 26 to
+  `sys.path.insert(0, str(REPO))` before the first `src` import, reusing each
+  file's existing repo-root constant where one already existed (e.g.
+  `purge_batch.py`'s `ROOT`, also used by `os.chdir(ROOT)`) instead of adding
+  a second name for the same path. Added
+  `tests/test_entrypoint_bootstrap.py`, a static AST test that walks every
+  `.py` under `scripts/` and `tools/` and fails if a module-level `from
+  src...`/`import src` line has no `sys.path.insert` strictly before it —
+  this is what makes the bug un-reintroducible; verified it fails on a
+  deliberately reverted file and passes once restored. 74 passed, 0 failed;
+  `ruff check .` unchanged at 325 findings versus `main`. (T-936)
 - `pytest` is now a warning gate: `pytest.ini` gets `filterwarnings = error`
   plus a single documented ignore for pyrogram 2.0.106's
   `asyncio.get_event_loop()` DeprecationWarning (raised at import time in

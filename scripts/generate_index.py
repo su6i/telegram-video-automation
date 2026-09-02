@@ -1,18 +1,20 @@
 import asyncio
 import json
 import os
+import pathlib
 import sys
 
 from dotenv import load_dotenv
 from pyrogram import Client
 
+# The repo root has to be on sys.path before anything under src/ is imported —
+# running this file as a script puts scripts/ on sys.path, not the root.
+REPO = pathlib.Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(REPO))
+
 from src.env_resolver import env_path
 
-# Add project root to path
-sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-
 # Load env
-folder_path = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 load_dotenv(env_path())
 
 API_ID = os.getenv("API_ID")

@@ -28,6 +28,11 @@ from pathlib import Path
 
 from dotenv import load_dotenv
 
+# The repo root has to be on sys.path before anything under src/ is imported —
+# running this file as a script puts tools/knowledge/ on sys.path, not the root.
+REPO = Path(__file__).resolve().parents[2]
+sys.path.insert(0, str(REPO))
+
 from src.env_resolver import env_path as vault_env_path
 
 

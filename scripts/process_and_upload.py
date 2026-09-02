@@ -4,11 +4,17 @@ import getpass
 import json
 import logging
 import os
+import pathlib
 import re
 import subprocess
 import sys
 
 from dotenv import load_dotenv
+
+# The repo root has to be on sys.path before anything under src/ is imported —
+# running this file as a script puts scripts/ on sys.path, not the root.
+root_dir = pathlib.Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(root_dir))
 
 from src.env_resolver import env_path
 
@@ -19,9 +25,6 @@ tqdm = None
 from pyrogram import Client
 from pyrogram.errors import PasswordHashInvalid, SessionPasswordNeeded
 from telegram import Bot
-
-# Add project root to sys.path
-sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 # Import Shared Modules
 from src.caption_builder import build_caption, validate_caption
@@ -42,7 +45,6 @@ from src.video_utils import process_video_for_user_safe as process_video_for_use
 from src.video_utils import split_video_for_user_safe as split_video_for_user
 
 # Load environment variables
-root_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 load_dotenv(env_path())
 
 # Bot Config

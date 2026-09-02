@@ -7,8 +7,10 @@ import sys
 from datetime import UTC, datetime
 from pathlib import Path
 
-# Add project root to sys.path so "src.*" resolves when run as a script
-sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+# The repo root has to be on sys.path before anything under src/ is imported —
+# running this file as a script puts scripts/ on sys.path, not the root.
+REPO = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(REPO))
 
 from dotenv import load_dotenv
 from pyrogram import Client

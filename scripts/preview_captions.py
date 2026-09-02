@@ -11,14 +11,17 @@ would receive — without touching Telegram. Run it before every upload batch.
 """
 import argparse
 import os
+import pathlib
 import re
 import sys
 
-sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+# The repo root has to be on sys.path before anything under src/ is imported —
+# running this file as a script puts scripts/ on sys.path, not the root.
+REPO_ROOT = pathlib.Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(REPO_ROOT))
 
 from src.caption_builder import CAPTION_LIMIT, build_caption
 
-REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 os.chdir(REPO_ROOT)
 
 # Imported after chdir: the uploader resolves .storage relative to the cwd.

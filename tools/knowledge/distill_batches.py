@@ -22,7 +22,10 @@ import re
 import sys
 from pathlib import Path
 
-sys.path.append(str(Path(__file__).resolve().parents[2]))
+# The repo root has to be on sys.path before anything under src/ is imported —
+# running this file as a script puts tools/knowledge/ on sys.path, not the root.
+REPO = Path(__file__).resolve().parents[2]
+sys.path.insert(0, str(REPO))
 
 from src import manifest_tracker
 

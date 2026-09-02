@@ -1,9 +1,16 @@
 import asyncio
 import os
+import pathlib
+import sys
 
 from dotenv import load_dotenv
 from pyrogram import Client
 from telegram import Bot
+
+# The repo root has to be on sys.path before anything under src/ is imported —
+# running this file as a script puts scripts/ on sys.path, not the root.
+REPO = pathlib.Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(REPO))
 
 from src.env_resolver import env_path
 from src.telegram_utils import (
