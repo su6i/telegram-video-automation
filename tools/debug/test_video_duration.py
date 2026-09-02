@@ -1,10 +1,8 @@
 
+import argparse
 import os
 import subprocess
 
-STORAGE_DIR = ".storage"
-TEMP_VIDEO_DIR = os.path.join(STORAGE_DIR, "temp_video")
-OUTPUT_DIR = "output_720p"
 
 def get_duration(path):
     try:
@@ -18,6 +16,13 @@ def get_duration(path):
         return 0
 
 def diagnose():
+    parser = argparse.ArgumentParser(description="Test and diagnose video durations.")
+    parser.parse_args()
+
+    STORAGE_DIR = ".storage"
+    TEMP_VIDEO_DIR = os.path.join(STORAGE_DIR, "temp_video")
+    OUTPUT_DIR = "output_720p"
+
     print("🔍 Diagnosing Video Durations...")
     
     # 1. Check Temp Videos (Source)

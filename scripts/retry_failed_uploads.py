@@ -1,3 +1,4 @@
+import argparse
 import asyncio
 import os
 import pathlib
@@ -46,19 +47,6 @@ json_log_file = "upload_log.json"
 
 # Environment Validation
 required_vars = [telegram_token, channel_id, api_id, api_hash, channel_username]
-if not all(required_vars):
-    raise ValueError("""
-Please set the following variables in .env:
-- TELEGRAM_TOKEN (for Bot)
-- CHANNEL_ID (for Bot)  
-- API_ID (for User Account)
-- API_HASH (for User Account)
-- CHANNEL_USERNAME (for User Account - e.g. @mychannel)
-""")
-
-# Create output directory
-if not os.path.exists(output_dir):
-    os.makedirs(output_dir)
 
 async def get_channel_videos(app):
     """Retrieve list of existing videos in the channel"""
@@ -282,5 +270,22 @@ async def retry_failed_uploads():
         print("🔒 Connection closed")
 
 if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description="Retry failed video uploads.")
+    parser.parse_args()
+    
+    if not all(required_vars):
+        raise ValueError("""
+Please set the following variables in .env:
+- TELEGRAM_TOKEN (for Bot)
+- CHANNEL_ID (for Bot)  
+- API_ID (for User Account)
+- API_HASH (for User Account)
+- CHANNEL_USERNAME (for User Account - e.g. @mychannel)
+""")
+
+    # Create output directory
+    if not os.path.exists(output_dir):
+        os.makedirs(output_dir)
+
     print("🔄 Starting retry for missing files...")
     asyncio.run(retry_failed_uploads())

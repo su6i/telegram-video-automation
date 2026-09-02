@@ -1,4 +1,4 @@
-
+import argparse
 import json
 import os
 import re
@@ -7,6 +7,9 @@ CONTENT_FILE = ".storage/scraped_content.json"
 BACKUP_FILE = ".storage/scraped_content.json.pre_clean"
 
 def clean():
+    parser = argparse.ArgumentParser(description="Clean database by fixing titles and descriptions; rewrites the scraped_content database in place.")
+    parser.parse_args()
+
     if not os.path.exists(CONTENT_FILE):
         print("❌ Error: Content file not found.")
         return

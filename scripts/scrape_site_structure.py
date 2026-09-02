@@ -4,6 +4,7 @@ Scrape Example Course structure from generic platform
 Extracts all sections, lessons, and lesson types
 """
 
+import argparse
 import json
 import time
 
@@ -100,6 +101,9 @@ def scrape_course_structure(url, course_name):
         driver.quit()
 
 def main():
+    parser = argparse.ArgumentParser(description="Scrape course structure from generic platform.")
+    parser.parse_args()
+    
     url = "https://example.com/course/curriculum"
     
     print("=" * 80)

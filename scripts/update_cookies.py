@@ -1,3 +1,4 @@
+import argparse
 import json
 import os
 import pathlib
@@ -23,6 +24,9 @@ TARGET_URL = os.getenv("TARGET_SITE_BASE_URL", "https://example.com") + "/login"
 COOKIES_FILE = "auth_cookies.json"
 
 def main():
+    parser = argparse.ArgumentParser(description="Update cookies via interactive login.")
+    parser.parse_args()
+    
     print("🍪 Interactive Cookie Updater")
     print("----------------------------")
     print("This script will open a Chrome window.")

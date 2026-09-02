@@ -1,3 +1,4 @@
+import argparse
 import json
 import os
 import re
@@ -213,5 +214,7 @@ def patch_all_lessons():
     print(f"✅ Reset and re-linked {total} pages. No ghost files remain.")
 
 if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description="Generate local course viewer portal.")
+    parser.parse_args()
     generate_portal()
     patch_all_lessons()

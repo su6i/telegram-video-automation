@@ -1,4 +1,4 @@
-
+import argparse
 import json
 import os
 
@@ -6,6 +6,9 @@ CONTENT_FILE = ".storage/scraped_content.json"
 BACKUP_FILE = ".storage/scraped_content.json.pre_clean"
 
 def restore_descriptions():
+    parser = argparse.ArgumentParser(description="Restore descriptions from backup; rewrites the content database in place.")
+    parser.parse_args()
+
     if not os.path.exists(CONTENT_FILE) or not os.path.exists(BACKUP_FILE):
         print("❌ Error: Files not found.")
         return

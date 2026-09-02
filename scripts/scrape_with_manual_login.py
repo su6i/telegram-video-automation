@@ -4,6 +4,7 @@ Scrape course structure after manual login
 Waits for user to login, then scrapes the categories page
 """
 
+import argparse
 import time
 
 from selenium import webdriver
@@ -150,6 +151,9 @@ def scrape_after_login(login_url, target_url):
         driver.quit()
 
 def main():
+    parser = argparse.ArgumentParser(description="Scrape course structure after manual login.")
+    parser.parse_args()
+    
     login_url = "https://example.com/login"
     target_url = "https://example.com/course/curriculum"
     
