@@ -45,17 +45,32 @@ ENT_LIMIT = 100        # Telegram's hard per-message entity cap (<a>, <b>, ...).
                        # Exceed it and the excess entities are silently
                        # dropped -- the text still renders, but the links
                        # past #100 go dead with no error and no truncation
-                       # marker. 100 is the only value that fits the index
-                       # into the 8 reserved INDEX_SLOTS: ENT_LIMIT = 95
-                       # needs 9 posts, which doesn't fit. Do not raise it.
+                       # marker. 100 is Telegram's own cap, not a tuning
+                       # knob: raising it drops links. (It used to also be the
+                       # only value the index fit into -- 8 slots, where 95
+                       # needed 9 posts. T-940 reclaimed 8 more slots, so that
+                       # particular squeeze is gone; the cap is not.)
 CAPTION_LIMIT = 1024
 
 # --- slots ------------------------------------------------------------------
 BANNER_SLOT = 2
 ABOUT_SLOT = 3
-INDEX_SLOTS = [4, 5, 6, 7, 8, 9, 10, 11]   # was [4,5,6,7]; absorbed HEAD_SPARE
+# Every id below is a message that exists and can still be edited. Ids that
+# were never used or have been deleted are NOT slots: Telegram cannot edit a
+# deleted message, ever. Verified live 2026-09-03 over ids 1-305 (T-940):
+# 12-64 and 238-290 are deleted end to end -- the "reclaim 12-64" growth path
+# the docs used to promise does not exist and never will.
+INDEX_SLOTS = (
+    [4, 5, 6, 7, 8, 9, 10, 11]              # was [4,5,6,7]; absorbed HEAD_SPARE
+    + [70, 84, 90, 93, 99, 101, 103, 107]   # T-940: reclaimed caption-overflow
+)                                           # orphans; 12-64 in between are all
+                                            # deleted, so in the channel view
+                                            # these read as a direct
+                                            # continuation of the index.
 HEAD_SPARE = []                             # exhausted -- see build_plan()'s guard
 DIVIDER_SLOTS = list(range(111, 126))
+# T-940: the other 10 reclaimed orphans, below the divider and above the tail.
+MID_SPARE = [133, 186, 211, 216, 224, 226, 230, 232, 235, 237]
 TAIL_SPARE = list(range(291, 306))
 
 BANNER = """<pre>
@@ -231,20 +246,25 @@ def build_plan(entries, msg_of, internal, dup_ids, live_by_title, attach_state):
     posts = build_index(entries, msg_of, internal, attach_state)
     if len(posts) > len(INDEX_SLOTS):
         raise SystemExit(
-            f"index needs {len(posts)} posts but only {len(INDEX_SLOTS)} slots are "
-            f"reserved — HEAD_SPARE is exhausted (it was absorbed into INDEX_SLOTS "
-            f"to fit the entity-aware split, see T-937). Reclaiming ids 12-64 is "
-            f"possible but needs an owner decision plus a live read of what those "
-            f"messages currently are; that's out of scope here. See TODO.md.")
+            f"index needs {len(posts)} posts but only {len(INDEX_SLOTS)} slots "
+            f"exist. There is no reserve left to absorb: HEAD_SPARE went into "
+            f"INDEX_SLOTS for the entity-aware split (T-937) and the 8 reclaimed "
+            f"orphans went in after the purge (T-940). Ids 12-64 and 238-290 are "
+            f"deleted, and a deleted message can never be edited — they are not a "
+            f"growth path. The only ways forward are MID_SPARE (10 slots, but they "
+            f"sit below the divider, so the index would no longer read as one "
+            f"block) or posting new messages below the library. Owner decision. "
+            f"See TODO.md.")
 
     plan = []
     plan.append((BANNER_SLOT, "text", BANNER.format(n=n, c=c)))
     plan.append((ABOUT_SLOT, "text", ABOUT.format(n=n, c=c, i=len(posts))))
     for slot, body in zip(INDEX_SLOTS, posts):
         plan.append((slot, "text", body))
-    for slot in INDEX_SLOTS[len(posts):]:
+    free = INDEX_SLOTS[len(posts):]
+    for i, slot in enumerate(free, 1):
         plan.append((slot, "text", SPARE.format(label="INDEX SPARE",
-                                                i=slot, total="—")))
+                                                i=i, total=len(free))))
     for i, slot in enumerate(HEAD_SPARE, 1):
         plan.append((slot, "text", SPARE.format(label="HEAD SPARE",
                                                 i=i, total=len(HEAD_SPARE))))
@@ -256,6 +276,9 @@ def build_plan(entries, msg_of, internal, dup_ids, live_by_title, attach_state):
             j = i - len(DIVIDER_ART) + 1
             plan.append((slot, "text", SPARE.format(
                 label="SPARE", i=j, total=len(DIVIDER_SLOTS) - len(DIVIDER_ART))))
+    for i, slot in enumerate(MID_SPARE, 1):
+        plan.append((slot, "text", SPARE.format(label="MID SPARE", i=i,
+                                                total=len(MID_SPARE))))
     for i, slot in enumerate(TAIL_SPARE, 1):
         if slot == TAIL_SPARE[-1]:
             plan.append((slot, "text",

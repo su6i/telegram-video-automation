@@ -2,6 +2,36 @@
 
 ## Unreleased
 
+### Added
+- T-940: reclaimed the 18 caption-overflow orphans the purge left behind, turning
+  them into reserve slots. `purge_superseded.py` only deletes messages carrying a
+  video, so when the owner ran it (71 videos in `65-109`/`126-237`, 2026-09-03)
+  the separate `📄 Continued:` text messages that used to hold caption overflow
+  survived with their parents gone. A live read-only census of ids `1-305`
+  (`kind` per id, nothing sent) found 58 live text messages and, inside the two
+  purge ranges, exactly 18 orphans: 8 at `70, 84, 90, 93, 99, 101, 103, 107` and
+  10 at `133, 186, 211, 216, 224, 226, 230, 232, 235, 237`. An orphan is an
+  ordinary editable text message, so the 8 extend `INDEX_SLOTS` (8 -> **16**
+  posts of index capacity, doubling the headroom T-937 had reduced to zero) and
+  the 10 become a new `MID_SPARE` pool. The 8 can carry index content and the 10
+  cannot: ids `12-64` between slot `11` and slot `70` are deleted and leave no
+  visual trace, so `70..107` render as a direct continuation of the index, while
+  `MID_SPARE` sits below the divider art at `111-125`.
+  The same census also **falsified the documented growth path**: `12-64` and
+  `238-290` are deleted end to end, and Telegram can never edit a deleted
+  message, so the "reclaiming ids 12-64 is possible" note in
+  `docs/CHANNEL-LAYOUT.md`, `TODO.md` and `build_plan()`'s hard-fail message was
+  wrong. All three corrected; the guard now names the two real options (spend
+  `MID_SPARE` and lose the single-block index, or append below the library).
+  Fixed in passing: unused index slots rendered as `Reserved slot 70/—`, printing
+  a message id where an ordinal belongs — now `1/8`. Two new tests in
+  `tests/test_remodel_head.py` assert no slot pool ever claims an id in the dead
+  bands, that no id is claimed twice, that no slot reaches into the library
+  (`306+`), and that `INDEX_SLOTS` stays sorted (index posts must read in id
+  order). 83 passed, 0 failed; `ruff check .` unchanged at 310. Live dry run
+  after the change: 58 text edits, 0 caption edits — confirming no superseded
+  video is left to re-caption. (T-940)
+
 ### Fixed
 - `scripts/preview_captions.py` used to `os.chdir()` and `exec_module()`
   `process_and_upload.py` at import time (before `--help` could exit) — this is
