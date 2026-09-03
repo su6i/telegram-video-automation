@@ -1,3 +1,4 @@
+import argparse
 import json
 import os
 from typing import Any
@@ -128,3 +129,14 @@ class SmartAgent:
         cost = (u.prompt_token_count/1e6 * cfg["in"]) + (u.candidates_token_count/1e6 * cfg["out"])
         self.stats["total_cost"] += cost
         print(f"💰 Cost: ${cost:.4f} | Total: ${self.stats['total_cost']:.4f}")
+
+
+def main() -> None:
+    parser = argparse.ArgumentParser(
+        description="Library module defining SmartAgent (Gemini-backed cost-optimized dispatcher); no standalone CLI behavior."
+    )
+    parser.parse_args()
+
+
+if __name__ == "__main__":
+    main()

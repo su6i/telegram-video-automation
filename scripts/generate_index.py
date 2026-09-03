@@ -1,3 +1,4 @@
+import argparse
 import asyncio
 import json
 import os
@@ -25,7 +26,6 @@ CHANNEL_TARGET = os.getenv("CHANNEL_USERNAME") or CHANNEL_ID
 
 # Storage directory
 STORAGE_DIR = ".storage"
-os.makedirs(STORAGE_DIR, exist_ok=True)
 # Files
 MANIFEST_FILE = os.path.join(STORAGE_DIR, "downloaded_video.txt")
 UPLOAD_HISTORY_FILE = os.path.join(STORAGE_DIR, "upload_history.json")
@@ -160,6 +160,7 @@ def generate_index_text(videos, history):
     return blocks
 
 async def main():
+    os.makedirs(STORAGE_DIR, exist_ok=True)
     print("🔄 Generating Index...")
     videos = parse_manifest()
     history = load_history()
@@ -236,4 +237,6 @@ async def main():
         print("✅ Index Updated Successfully.")
 
 if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description="Generate and update course index in Telegram channel.")
+    parser.parse_args()
     asyncio.run(main())

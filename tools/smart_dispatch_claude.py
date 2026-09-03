@@ -15,6 +15,7 @@ Usage:
     result = agent.run_task("Summarize this text...")
 """
 
+import argparse
 import hashlib
 import json
 import os
@@ -203,6 +204,11 @@ class SmartAgent:
 
 # Example usage
 if __name__ == "__main__":
+    parser = argparse.ArgumentParser(
+        description="Smart dispatch agent for Claude; processes tasks and tracks usage."
+    )
+    parser.parse_args()
+
     # Load API key from environment
     api_key = os.getenv("GEMINI_API_KEY")
     

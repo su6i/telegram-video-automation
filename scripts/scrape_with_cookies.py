@@ -3,6 +3,7 @@
 Scrape course structure using saved session/cookies
 """
 
+import argparse
 import json
 
 import requests
@@ -77,6 +78,9 @@ def scrape_with_cookies(url, cookies_file):
         return None
 
 def main():
+    parser = argparse.ArgumentParser(description="Scrape course structure using saved session/cookies.")
+    parser.parse_args()
+    
     cookies_file = "auth_cookies.json"
     url = "https://example.com/course/categories"
     

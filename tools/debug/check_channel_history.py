@@ -1,3 +1,4 @@
+import argparse
 import os
 import pathlib
 import re
@@ -16,24 +17,6 @@ from src.env_resolver import env_path
 # Load .env
 root_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 load_dotenv(env_path())
-
-api_id = os.getenv("API_ID")
-api_hash = os.getenv("API_HASH")
-# Use the same logic as process_and_upload to find the ID
-channel_username = os.getenv("CHANNEL_USERNAME") or os.getenv("CHANNEL_ID")
-
-if not api_id or not api_hash:
-    print("❌ API Credentials missing in .env")
-    exit(1)
-
-# Ensure ID is int if possible
-if channel_username and (str(channel_username).startswith('-') or str(channel_username).isdigit()):
-    try:
-        channel_username = int(channel_username)
-    except ValueError:
-        pass
-
-app = Client("hybrid_account", api_id=api_id, api_hash=api_hash)
 
 async def main():
     async with app:
@@ -111,4 +94,24 @@ async def main():
             print("\n⚠️ No numbered videos found (e.g. '001 - Title').")
 
 if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description="Check channel history for missing videos")
+    parser.parse_args()
+
+    api_id = os.getenv("API_ID")
+    api_hash = os.getenv("API_HASH")
+    # Use the same logic as process_and_upload to find the ID
+    channel_username = os.getenv("CHANNEL_USERNAME") or os.getenv("CHANNEL_ID")
+
+    if not api_id or not api_hash:
+        print("❌ API Credentials missing in .env")
+        exit(1)
+
+    # Ensure ID is int if possible
+    if channel_username and (str(channel_username).startswith('-') or str(channel_username).isdigit()):
+        try:
+            channel_username = int(channel_username)
+        except ValueError:
+            pass
+
+    app = Client("hybrid_account", api_id=api_id, api_hash=api_hash)
     app.run(main())

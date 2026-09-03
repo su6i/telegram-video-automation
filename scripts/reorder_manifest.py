@@ -1,3 +1,4 @@
+import argparse
 import os
 import pathlib
 import sys
@@ -11,6 +12,9 @@ from src.manifest_manager import ManifestManager
 
 
 def reorder():
+    parser = argparse.ArgumentParser(description="Reorder the downloaded video manifest.")
+    parser.parse_args()
+    
     storage_dir = ".storage"
     manifest_path = os.path.join(storage_dir, "downloaded_video.txt")
     

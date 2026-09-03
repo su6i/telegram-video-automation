@@ -1,3 +1,4 @@
+import argparse
 import os
 import pathlib
 import sys
@@ -15,16 +16,6 @@ from src.env_resolver import env_path
 # Load from root .env
 root_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 load_dotenv(env_path())
-
-api_id = os.getenv("API_ID")
-api_hash = os.getenv("API_HASH")
-target_id = os.getenv("CHANNEL_ID") or os.getenv("CHANNEL_USERNAME")
-
-if not api_id or not api_hash:
-    print("❌ API Credentials missing.")
-    exit(1)
-
-app = Client("hybrid_account", api_id=api_id, api_hash=api_hash)
 
 async def main():
     async with app:
@@ -75,4 +66,16 @@ async def main():
             print(f"   ❌ Error checking saved messages: {e}")
 
 if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description="Diagnose Telegram channel access.")
+    parser.parse_args()
+
+    api_id = os.getenv("API_ID")
+    api_hash = os.getenv("API_HASH")
+    target_id = os.getenv("CHANNEL_ID") or os.getenv("CHANNEL_USERNAME")
+
+    if not api_id or not api_hash:
+        print("❌ API Credentials missing.")
+        exit(1)
+
+    app = Client("hybrid_account", api_id=api_id, api_hash=api_hash)
     app.run(main())

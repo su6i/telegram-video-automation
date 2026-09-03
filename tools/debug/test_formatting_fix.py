@@ -1,4 +1,5 @@
 
+import argparse
 import json
 import os
 import pathlib
@@ -16,11 +17,15 @@ sys.path.insert(0, str(REPO))
 
 from src.scrapers.primary_scraper import PrimaryScraper
 
-# Video 6 URL (Craft Better PROMPTS)
-TARGET_URL = "https://example.com/course/lesson"
-STORAGE_FILE = ".storage/scraped_content.json"
 
 def main():
+    parser = argparse.ArgumentParser(description="Re-scrape single URL for Content Priority check.")
+    parser.parse_args()
+
+    # Video 6 URL (Craft Better PROMPTS)
+    TARGET_URL = "https://example.com/course/lesson"
+    STORAGE_FILE = ".storage/scraped_content.json"
+
     print(f"🚀 (Recreated) Re-scraping single URL for Content Priority check: {TARGET_URL}")
     
     # Initialize Scraper

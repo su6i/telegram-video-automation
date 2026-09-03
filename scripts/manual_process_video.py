@@ -1,3 +1,4 @@
+import argparse
 import asyncio
 import os
 import pathlib
@@ -17,9 +18,6 @@ load_dotenv(env_path())
 # Config
 video_dir = "downloads"
 output_dir = "processed"
-
-if not os.path.exists(output_dir):
-    os.makedirs(output_dir)
 
 async def manual_process():
     filename = "004 - Beautiful data visualization with Python pprint module.mp4"
@@ -56,4 +54,10 @@ async def manual_process():
         print("❌ Processing failed.")
 
 if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description="Manually process a video file.")
+    parser.parse_args()
+    
+    if not os.path.exists(output_dir):
+        os.makedirs(output_dir)
+        
     asyncio.run(manual_process())

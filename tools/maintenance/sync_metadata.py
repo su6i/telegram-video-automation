@@ -1,4 +1,4 @@
-
+import argparse
 import json
 import os
 import re
@@ -65,6 +65,9 @@ def parse_manifest():
     return videos
 
 def sync():
+    parser = argparse.ArgumentParser(description="Synchronize metadata between manifest, history, and content database; rewrites files in place.")
+    parser.parse_args()
+
     print("🔄 Starting Metadata Synchronization...")
     
     videos = parse_manifest()

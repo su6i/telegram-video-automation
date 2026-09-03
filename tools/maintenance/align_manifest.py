@@ -1,3 +1,4 @@
+import argparse
 import os
 import re
 import shutil
@@ -16,6 +17,9 @@ def normalize_title(text):
     return re.sub(r'[^a-z0-9]', '', text.lower())
 
 def main():
+    parser = argparse.ArgumentParser(description="Align manifest file based on files.txt; rewrites the manifest file in place.")
+    parser.parse_args()
+
     if not os.path.exists(FILES_TXT):
         print(f"File {FILES_TXT} not found.")
         return

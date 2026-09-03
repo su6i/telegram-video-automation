@@ -1,4 +1,4 @@
-
+import argparse
 import re
 
 
@@ -34,20 +34,27 @@ def format_caption(meta, extra):
                 caption += f"📝 **Info:**\n{desc}"
     return caption
 
-# Mock Data
-meta_005 = {"course": "Example Masterclass", "section": "Getting Started", "index": "005", "line_title": "Overview Lesson", "title": "Overview Lesson"}
-extra_005 = {
-    "links": [{"text": "example.com", "url": "https://example.com/"}],
-    "description": "Overview Lesson\n12/25 Update! Important notes..."
-}
+def main() -> None:
+    parser = argparse.ArgumentParser(description="Test video caption formatting.")
+    parser.parse_args()
 
-meta_006 = {"course": "Example Masterclass", "section": "Getting Started", "index": "006", "line_title": "Deep Dive", "title": "Deep Dive"}
-extra_006 = {
-    "links": [],
-    "description": "Technical details\nComments\n123\nPost Comment\nUser: Great info!\nREPLY"
-}
+    # Mock Data
+    meta_005 = {"course": "Example Masterclass", "section": "Getting Started", "index": "005", "line_title": "Overview Lesson", "title": "Overview Lesson"}
+    extra_005 = {
+        "links": [{"text": "example.com", "url": "https://example.com/"}],
+        "description": "Overview Lesson\n12/25 Update! Important notes..."
+    }
 
-print("--- VIDEO 005 CAPTION ---")
-print(format_caption(meta_005, extra_005))
-print("\n--- VIDEO 006 CAPTION (Initially Dirty) ---")
-print(format_caption(meta_006, extra_006))
+    meta_006 = {"course": "Example Masterclass", "section": "Getting Started", "index": "006", "line_title": "Deep Dive", "title": "Deep Dive"}
+    extra_006 = {
+        "links": [],
+        "description": "Technical details\nComments\n123\nPost Comment\nUser: Great info!\nREPLY"
+    }
+
+    print("--- VIDEO 005 CAPTION ---")
+    print(format_caption(meta_005, extra_005))
+    print("\n--- VIDEO 006 CAPTION (Initially Dirty) ---")
+    print(format_caption(meta_006, extra_006))
+
+if __name__ == "__main__":
+    main()

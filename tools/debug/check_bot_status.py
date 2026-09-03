@@ -1,3 +1,4 @@
+import argparse
 import asyncio
 import os
 import pathlib
@@ -14,10 +15,6 @@ sys.path.insert(0, str(REPO))
 from src.env_resolver import env_path
 
 load_dotenv(env_path())
-
-api_id = os.getenv("API_ID")
-api_hash = os.getenv("API_HASH")
-bot_token = os.getenv("TELEGRAM_TOKEN")
 
 async def check_bot_access():
     """Check bot access to channel"""
@@ -82,4 +79,11 @@ async def check_bot_access():
         await app.stop()
 
 if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description="Check bot access to channel")
+    parser.parse_args()
+    
+    api_id = os.getenv("API_ID")
+    api_hash = os.getenv("API_HASH")
+    bot_token = os.getenv("TELEGRAM_TOKEN")
+
     asyncio.run(check_bot_access())

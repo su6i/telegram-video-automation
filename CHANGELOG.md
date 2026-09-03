@@ -3,6 +3,60 @@
 ## Unreleased
 
 ### Fixed
+- T-938: `--help` was not safe to run on 34 of 51 entry points under `scripts/`
+  and `tools/` — none of them built an `argparse.ArgumentParser`, so `--help`
+  was silently ignored and the script ran for real. A dispatched agent hit
+  this spot-checking WO-TVA-0008: `uv run --directory <repo>
+  scripts/generate_index.py --help` opened a live Pyrogram connection to
+  Telegram and prompted `Enter phone number or bot token:` before crashing on
+  EOF, creating `scripts/index_bot.session` (gitignored, since deleted). 10 of
+  the 34 had no `if __name__ == "__main__":` guard at all and ran every
+  top-level statement on bare import; the other 24 already had a guard but no
+  parser. Fixed all 34: every module-level statement that does real work
+  (opening a Selenium/Chrome session, a Pyrogram `Client`, `input()`, a file
+  write) now runs only inside the guarded entry point, after a
+  `parser.parse_args()` that gates it — moved verbatim into `main()` (or the
+  `if __name__` block for an `asyncio.run(...)` wrapper) in original order, no
+  drops, no reordering; constants still read by other module-level functions
+  (e.g. `generate_index.py`'s `STORAGE_DIR`/`MANIFEST_FILE` family) were left
+  at module scope untouched. `tools/debug/resolve_channel.py`'s manual
+  `sys.argv[1]` positional read became a real
+  `argparse` positional (`invite_link`, still falling back to
+  `CHANNEL_INVITE_LINK` from `.env`). Left the pre-existing `F821`
+  undefined-name bugs in `scripts/retry_failed_uploads.py` untouched (T-934,
+  a separate judgment call) and the pre-existing `F811` duplicate-`reconstruct`
+  definition in `tools/maintenance/reconstruct_manifest.py` untouched (the
+  argparse block was mechanically added to both definitions; only the second,
+  live one is ever called). Added `tests/test_entrypoint_cli.py`, three static
+  AST tests over every `.py` under `scripts/` and `tools/`: every file builds
+  an `ArgumentParser`, every file has a `__main__` guard, and no file makes a
+  bare module-level call outside a small allowlist (`load_dotenv`,
+  `sys.path.insert`, `logging.basicConfig`, `warnings.filterwarnings`) plus a
+  short, named, per-file exemption list for three pre-existing files this WO
+  intentionally left untouched (`preview_captions.py`, `process_and_upload.py`,
+  `purge_batch.py`) that already gate their own work behind a module-level
+  `parser.parse_args()` — a different but equally valid shape. Verified the
+  new tests fail on a deliberately reverted file and pass once restored. 77
+  passed, 0 failed; `ruff check .` unchanged at 324 findings versus `main`
+  (diffed by file+rule, not eyeballed — two mechanical side effects of moving
+  code into function scope, an unsorted-import block in 9 files and one
+  local variable that was already unused before the move, were fixed/noqa'd
+  to keep the count flat). Spot-checked `--help` from outside the repo on the
+  three files that used to open live connections
+  (`scripts/tg_login.py`, `scripts/generate_index.py`,
+  `tools/debug/resolve_channel.py`): usage printed, exit 0, no session file
+  created, no prompt. (T-938)
+
+- T-938 residual, deliberately not fixed here: `scripts/preview_captions.py`
+  still `os.chdir()`s and dynamically `exec_module()`s
+  `scripts/process_and_upload.py` at *import* time, i.e. before its own
+  `--help` can exit. It is filesystem-only — the exec'd module has no
+  module-level Telegram work (no `Client`, no prompt, no network) — so it
+  is not the hazard T-938 was opened for, but it does not satisfy the new
+  "`--help` exits before anything happens" contract either. Unwinding it
+  means making `_uploader` lazily loaded, a refactor of its own. Recorded
+  as a per-file exemption in `tests/test_entrypoint_cli.py` with the
+  reasoning inline.
 - `build_index()` (`tools/channel/remodel_head.py`) chunked the channel
   index on visible characters only (`LIMIT = 3700`), never on Telegram's
   hard 100-entity-per-message cap. WO-TVA-0006 tripled entities per lesson

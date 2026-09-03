@@ -1,3 +1,4 @@
+import argparse
 import asyncio
 import os
 import pathlib
@@ -18,11 +19,8 @@ load_dotenv(env_path())
 
 api_id = os.getenv("API_ID")
 api_hash = os.getenv("API_HASH")
-# The invite link grants access to a private channel, so it is an argument,
-# never a committed literal (rule 035).
-invite_link = sys.argv[1] if len(sys.argv) > 1 else os.getenv("CHANNEL_INVITE_LINK", "")
 
-async def main():
+async def main(invite_link):
     if not api_id or not api_hash:
         print("❌ API_ID or API_HASH missing in .env")
         return
@@ -68,4 +66,10 @@ async def main():
                 print(f"❌ Error resolving link: {e}")
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    parser = argparse.ArgumentParser(description="Resolve a Telegram invite link to a chat id.")
+    # The invite link grants access to a private channel, so it is an argument,
+    # never a committed literal (rule 035).
+    parser.add_argument("invite_link", nargs="?", default=os.getenv("CHANNEL_INVITE_LINK", ""), help="Invite link to resolve; falls back to CHANNEL_INVITE_LINK from .env")
+    args = parser.parse_args()
+
+    asyncio.run(main(args.invite_link))

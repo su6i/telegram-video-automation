@@ -2,6 +2,7 @@
 """
 Check video upload status from manifest.
 """
+import argparse
 import pathlib
 import sys
 
@@ -18,6 +19,8 @@ from src.manifest_tracker import (
 
 
 def main():
+    parser = argparse.ArgumentParser(description="Check video upload status from manifest.")
+    parser.parse_args()
     print("=" * 70)
     print("📊 Video Upload Status Report")
     print("=" * 70)

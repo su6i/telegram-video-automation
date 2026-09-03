@@ -1,10 +1,13 @@
-
+import argparse
 import json
 import os
 
 CONTENT_FILE = ".storage/scraped_content.json"
 
 def deduplicate():
+    parser = argparse.ArgumentParser(description="Deduplicate JSON content database; rewrites the database in place.")
+    parser.parse_args()
+
     if not os.path.exists(CONTENT_FILE):
         return
 

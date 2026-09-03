@@ -1,4 +1,4 @@
-
+import argparse
 import json
 import os
 import re
@@ -27,6 +27,9 @@ def _norm_url(url):
     return url
 
 def reconstruct():
+    parser = argparse.ArgumentParser(description="Reconstruct manifest file from content database and backup; rewrites the manifest file in place.")
+    parser.parse_args()
+
     if not os.path.exists(CONTENT_FILE):
         print("❌ Error: Content file not found.")
         return
@@ -46,6 +49,9 @@ def _norm_title(title):
     return title.lower().strip()
 
 def reconstruct():
+    parser = argparse.ArgumentParser(description="Reconstruct manifest file from content database and backup; rewrites the manifest file in place.")
+    parser.parse_args()
+
     if not os.path.exists(CONTENT_FILE):
         print("❌ Error: Content file not found.")
         return

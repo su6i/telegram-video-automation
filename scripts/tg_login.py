@@ -5,6 +5,7 @@ One-off interactive login that creates the Pyrogram user session
 Run it once, answer the phone-number / login-code prompts, and every later
 upload run reuses the session file without asking again.
 """
+import argparse
 import asyncio
 import os
 import sys
@@ -24,10 +25,6 @@ load_dotenv(env_path())
 api_id = os.getenv("API_ID")
 api_hash = os.getenv("API_HASH")
 
-if not api_id or not api_hash:
-    sys.exit("❌ API_ID / API_HASH missing from .env")
-
-
 async def main():
     app = Client("hybrid_account", api_id=int(api_id), api_hash=api_hash, workdir=ROOT)
     print("🚨 Enter your PHONE NUMBER (e.g. +49...), NOT a bot token.\n")
@@ -40,4 +37,10 @@ async def main():
 
 
 if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description="Interactive Telegram login to save session.")
+    parser.parse_args()
+    
+    if not api_id or not api_hash:
+        sys.exit("❌ API_ID / API_HASH missing from .env")
+        
     asyncio.run(main())

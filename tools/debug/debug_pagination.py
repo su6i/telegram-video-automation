@@ -3,38 +3,47 @@
 Debug script to check pagination issues
 """
 
+import argparse
 import sys
 
 sys.path.insert(0, '.')
 
 from src.scrapers.primary_scraper import PrimaryScraper
 
-print("🔍 Testing course pagination...\n")
 
-scraper = PrimaryScraper()
-course_url = "https://example.com/course"
+def main() -> None:
+    parser = argparse.ArgumentParser(description="Debug script to check pagination issues.")
+    parser.parse_args()
 
-# Track what we find
-videos = scraper.get_video_links(limit=None)
+    print("🔍 Testing course pagination...\n")
 
-print("\n\n📊 Summary:")
-print(f"   Total videos found: {len(videos)}")
+    scraper = PrimaryScraper()
+    course_url = "https://example.com/course"  # noqa: F841 -- pre-existing dead code, unused before this move too (was a module global); not this WO's job to drop it
 
-# Group by section
-from collections import defaultdict
+    # Track what we find
+    videos = scraper.get_video_links(limit=None)
 
-by_section = defaultdict(int)
-for v in videos:
-    section = v.get('section', 'Unknown')
-    by_section[section] += 1
+    print("\n\n📊 Summary:")
+    print(f"   Total videos found: {len(videos)}")
 
-print("\n   By section:")
-for section in sorted(by_section.keys()):
-    print(f"      - {section}: {by_section[section]} videos")
+    # Group by section
+    from collections import defaultdict
 
-# Show if we have duplicates
-urls = [v['url'] for v in videos]
-if len(urls) != len(set(urls)):
-    print(f"\n   ⚠️ WARNING: Found {len(urls) - len(set(urls))} duplicate URLs!")
-else:
-    print("\n   ✅ No duplicates found")
+    by_section = defaultdict(int)
+    for v in videos:
+        section = v.get('section', 'Unknown')
+        by_section[section] += 1
+
+    print("\n   By section:")
+    for section in sorted(by_section.keys()):
+        print(f"      - {section}: {by_section[section]} videos")
+
+    # Show if we have duplicates
+    urls = [v['url'] for v in videos]
+    if len(urls) != len(set(urls)):
+        print(f"\n   ⚠️ WARNING: Found {len(urls) - len(set(urls))} duplicate URLs!")
+    else:
+        print("\n   ✅ No duplicates found")
+
+if __name__ == "__main__":
+    main()
