@@ -27,14 +27,6 @@ ALLOWED_MODULE_LEVEL_CALLS = frozenset(
 # Do not widen the general allowlist above for these; add a new file entry
 # here instead, deliberately, if a specific file needs one.
 PER_FILE_EXEMPT_MODULE_LEVEL_CALLS = {
-    # The one residual exception: this file chdirs and exec's
-    # process_and_upload.py at *import* time, before its own parse_args()
-    # in main() — so `preview_captions.py --help` does run something first.
-    # It is filesystem-only (the exec'd module has no module-level Telegram
-    # work: no Client, no prompt, no network), so it is not the hazard T-938
-    # was opened for, and unwinding it means making `_uploader` lazy — a
-    # refactor of its own. Tracked as a follow-up, not silently blessed.
-    "scripts/preview_captions.py": {"chdir", "exec_module"},
     # Parser is built and parsed at module level (before any dangerous
     # work), so its own parser.add_argument(...) calls are safe by
     # construction; os.makedirs(STORAGE_DIR) runs after parse_args().

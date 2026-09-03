@@ -3,6 +3,16 @@
 ## Unreleased
 
 ### Fixed
+- `scripts/preview_captions.py` used to `os.chdir()` and `exec_module()`
+  `process_and_upload.py` at import time (before `--help` could exit) — this is
+  the residual the T-938 entry below recorded as deliberately not fixed. Now
+  fixed: the load is lazy, moved into a `_load_uploader()` function called from
+  `main()` after `parse_args()`; the `os.chdir()` is kept
+  (`process_and_upload.py`'s `STORAGE_DIR = ".storage"` genuinely depends on
+  running from the repo root) but scoped with try/finally so the original CWD
+  is always restored after the load. Removed `preview_captions.py` from the
+  per-file exemption list in `tests/test_entrypoint_cli.py` so the existing
+  three static AST tests now cover it unmodified. (T-939)
 - T-938: `--help` was not safe to run on 34 of 51 entry points under `scripts/`
   and `tools/` — none of them built an `argparse.ArgumentParser`, so `--help`
   was silently ignored and the script ran for real. A dispatched agent hit
