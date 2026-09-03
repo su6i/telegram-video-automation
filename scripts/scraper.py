@@ -21,6 +21,7 @@ sys.path.insert(0, str(REPO))
 from src import config
 from src.media_library import MediaLibrary
 from src.page_archiver import archive_page
+from src.reporter import print_detailed_statistics
 
 # Dynamic Configuration
 STORAGE_DIR = config.get_path("base_dir")
@@ -579,28 +580,6 @@ def insert_into_manifest(entry_data):
     except Exception as e:
         print(f"Write Error: {e}")
         return False
-
-    # ... inside process_single_url after download ...
-        if success: 
-            print("   ✅ Video Downloaded")
-            print(f"   📂 Saved to: {os.path.abspath(final_video_path)}")
-            
-            # 4. Update Manifest (Insert at correct location)
-            entry = {
-                'index': index_str,
-                'title': title,
-                'url': video_url,
-                'course': course,
-                'section': section
-            }
-            if insert_into_manifest(entry):
-                print(f"   📝 Inserted into manifest: {MANIFEST_FILE}")
-            else:
-                print("   ⚠️ Failed to update manifest.")
-                
-        else: print("   ❌ Video Download Failed")
-    else:
-        print("   ⚠️ No video URL found.")
 
 
 def main():

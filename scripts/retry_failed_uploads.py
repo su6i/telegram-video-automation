@@ -42,8 +42,8 @@ api_hash = os.getenv("API_HASH")
 channel_username = os.getenv("CHANNEL_USERNAME")
 
 # Additional Config
-processed_dir = "processed"
-json_log_file = "upload_log.json"
+video_dir = os.getenv("VIDEO_DIR", "downloads")
+output_dir = os.getenv("PROCESSED_DIR", "processed")
 
 # Environment Validation
 required_vars = [telegram_token, channel_id, api_id, api_hash, channel_username]

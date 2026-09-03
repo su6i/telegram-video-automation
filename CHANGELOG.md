@@ -3,6 +3,38 @@
 ## Unreleased
 
 ### Fixed
+- T-934 (remainder): resolved the 14 `F821` undefined-name findings left in
+  `scripts/scraper.py` and `scripts/retry_failed_uploads.py` after the T-934
+  import/rename pass. `scripts/scraper.py:112` called
+  `print_detailed_statistics(collected_lessons)` with no such import in scope —
+  `git log -p` showed the import (`from src.reporter import
+  print_detailed_statistics`) was commented out during a past refactor
+  alongside `ManifestManager`'s; `ManifestManager`'s import was later restored
+  elsewhere in the file but `reporter`'s never was, so the scan-summary flow
+  raised `NameError` every time it ran. `src/reporter.py` still defines the
+  real function with the matching signature — restored the import rather than
+  writing a replacement. Also deleted a 21-line dead-code fragment sitting
+  after `insert_into_manifest()` (unreachable — every path through that
+  function already returns before it) that referenced 5 more undefined names
+  (`success`, `final_video_path`, `index_str`, `title`, `video_url`); confirmed
+  first that `process_single_url()` earlier in the file already performs the
+  equivalent manifest-insert-plus-success-print on the real download path, so
+  the fragment was a stray copy-paste leftover, not the only copy of live
+  logic. `scripts/retry_failed_uploads.py` had two never-referenced module
+  vars (`processed_dir`, `json_log_file`, confirmed dead via grep) while the
+  rest of the script used `video_dir`/`output_dir` (directory listing, output
+  path construction) without ever defining them; replaced the dead vars with
+  `video_dir = os.getenv("VIDEO_DIR", "downloads")` /
+  `output_dir = os.getenv("PROCESSED_DIR", "processed")`, matching the
+  convention already used in `scripts/process_and_upload.py` and
+  `scripts/replace_video.py` — `git log -p --all` on this file showed no
+  earlier commit ever defined these, so this is a reconstruction from
+  convention, not a restore. Verified: `ruff check --select F821
+  scripts/scraper.py scripts/retry_failed_uploads.py` now passes clean;
+  `pytest -q` still 81 passed, 0 failed; `ruff check .` dropped from 324 to
+  310 findings, and the diff against `main` is exactly these 14 `F821` rows
+  gone with every other rule's count unchanged.
+
 - T-938: `--help` was not safe to run on 34 of 51 entry points under `scripts/`
   and `tools/` — none of them built an `argparse.ArgumentParser`, so `--help`
   was silently ignored and the script ran for real. A dispatched agent hit
