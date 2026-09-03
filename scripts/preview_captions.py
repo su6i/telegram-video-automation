@@ -10,6 +10,7 @@ would receive — without touching Telegram. Run it before every upload batch.
     uv run --directory <repo> scripts/preview_captions.py --check
 """
 import argparse
+import importlib.util
 import os
 import pathlib
 import re
@@ -22,21 +23,33 @@ sys.path.insert(0, str(REPO_ROOT))
 
 from src.caption_builder import CAPTION_LIMIT, build_caption
 
-os.chdir(REPO_ROOT)
+_uploader = None
 
-# Imported after chdir: the uploader resolves .storage relative to the cwd.
-import importlib.util
 
-_spec = importlib.util.spec_from_file_location(
-    "_uploader", os.path.join(REPO_ROOT, "scripts", "process_and_upload.py")
-)
+def _load_uploader():
+    global _uploader
+    if _uploader is not None:
+        return _uploader
 
-# process_and_upload parses argv at import time; hide our own flags from it.
-_saved_argv = sys.argv
-sys.argv = [_saved_argv[0]]
-_uploader = importlib.util.module_from_spec(_spec)
-_spec.loader.exec_module(_uploader)
-sys.argv = _saved_argv
+    original_cwd = os.getcwd()
+    try:
+        os.chdir(REPO_ROOT)
+
+        _spec = importlib.util.spec_from_file_location(
+            "_uploader", os.path.join(REPO_ROOT, "scripts", "process_and_upload.py")
+        )
+
+        # process_and_upload parses argv at import time; hide our own flags from it.
+        _saved_argv = sys.argv
+        sys.argv = [_saved_argv[0]]
+        _uploader = importlib.util.module_from_spec(_spec)
+        _spec.loader.exec_module(_uploader)
+        sys.argv = _saved_argv
+    finally:
+        os.chdir(original_cwd)
+
+    return _uploader
+
 
 # Anything that must never reach a published caption.
 LEAK_PATTERNS = [
@@ -77,6 +90,7 @@ def main():
     ap.add_argument("--check", action="store_true",
                     help="only report captions with leaks or over the limit; exit 1 if any")
     args = ap.parse_args()
+    _load_uploader()
 
     report = []
     problems = []
