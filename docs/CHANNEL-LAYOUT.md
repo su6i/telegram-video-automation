@@ -21,10 +21,14 @@ them.
 | `291`–`305` | Tail spare, immediately above the library. The last one is the "library starts here" signpost |
 | `306`+ | The library: 283 lessons, then their resources and subtitles |
 
+## The bottom index (685-691)
+
+There is a second index at the bottom of the channel (ids 685-691). This index has 7 fixed slots and cannot grow ever (692+ are resource documents — they can't be edited into text, can't be moved, and deleting one makes that id permanently un-editable). It is built by the same `src/index_builder.py` shared builder as the head index (`build_index_or_fail`). It carries the title link + CC subtitle link, but not the 📎 resource link (arithmetic: 342 entities today → 625 of the 700 ceiling after adding CC; adding 📎 too would require 722, exceeding budget; the owner rejected stripping bold headers to make room).
+
 ## Sizing the index
 
 Do not guess. Two independent budgets apply, and a post closes when either
-would be exceeded:
+would be exceeded (the chunker is now shared between both indexes via `src/index_builder.py`, so they can no longer drift silently):
 
 - **Characters.** One index line is a lesson number plus a title (~40
   visible characters, counted in UTF-16 code units — Telegram's 4096 cap
@@ -34,7 +38,7 @@ would be exceeded:
 - **Entities.** Telegram allows at most **100 message entities** (`<a>`,
   `<b>`, ...) per message and silently drops the rest — no error, no
   truncation marker, the text renders with dead plain-text where the links
-  should be. Every lesson line costs 1 entity for the number link, +1 if it
+  should be. Every lesson line costs 1 entity for the lesson-title link, +1 if it
   has a resource link, +1 if it has a subtitle link; every course/section
   header costs 1. `ENT_LIMIT = 100` is Telegram's hard cap and is not
   adjustable — in practice this drives most splits today, well before the

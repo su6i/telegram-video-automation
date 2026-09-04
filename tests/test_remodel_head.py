@@ -12,6 +12,9 @@ from remodel_head import (
     INDEX_SLOTS,
     MID_SPARE,
     TAIL_SPARE,
+)
+
+from src.index_builder import (
     build_index,
     resource_and_subtitle_ids,
     visible,
@@ -53,8 +56,8 @@ def test_build_index_glyph_output():
     assert len(posts) == 1
     post = posts[0]
 
-    assert '<a href="https://t.me/c/1/100">001</a> <a href="https://t.me/c/1/200">📎</a> <a href="https://t.me/c/1/201">CC</a> · Intro' in post
-    assert '<a href="https://t.me/c/1/101">002</a> · Next' in post
+    assert '001 <a href="https://t.me/c/1/200">📎</a> <a href="https://t.me/c/1/201">CC</a> · <a href="https://t.me/c/1/100">Intro</a>' in post
+    assert '002 · <a href="https://t.me/c/1/101">Next</a>' in post
 
 
 def _entity_count(post):

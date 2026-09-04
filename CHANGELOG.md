@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+### Changed
+- One shared entity-aware builder (`src/index_builder.py`) now backs both the head index and the bottom index (`scripts/generate_index.py`), closing an entity-cap gap where the bottom index previously silently dropped links past 100 without enforcement. Both builders now hard-fail via `build_index_or_fail` (naming the caller, needed, available) instead of silently truncating. Char budgeting uses UTF-16 code units on both paths. The deep link has moved from the lesson number onto the title in both indexes. The bottom index (685-691) gained CC subtitle links (283) but not 📎 resource links — landing at a measured 617 of the 700-entity ceiling (7 posts × 100: 100/100/100/100/100/100/17), owner decision 2026-09-04, because adding resource links too would need 722 and stripping bold headers to make room was rejected. The bottom index is permanently capped at 7 posts: ids 692+ are resource *documents*, a document can never be edited into a text message, a message can never be moved, and deleting one only makes its id permanently un-editable — so no eighth slot can ever exist down there. (T-941)
+
 ### Added
 - T-940: reclaimed the 18 caption-overflow orphans the purge left behind, turning
   them into reserve slots. `purge_superseded.py` only deletes messages carrying a
