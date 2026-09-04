@@ -10,6 +10,7 @@ re-purposed:
     4-11   index         the full table of contents, one post per chunk
     111-125  divider     art + a signpost, in the middle of the old duplicates
     291-305  tail spare  reserved, immediately above the library
+    685-691  post-library  signpost + 6 spare slots, repurposed from the old fixed bottom index (T-943)
     others   duplicates  old uploads: caption rewritten to point at the live
                          lesson; the video itself is left alone (stage 1 never
                          deletes)
@@ -62,6 +63,20 @@ DIVIDER_SLOTS = list(range(111, 126))
 # T-940: the other 10 reclaimed orphans, below the divider and above the tail.
 MID_SPARE = [133, 186, 211, 216, 224, 226, 230, 232, 235, 237]
 TAIL_SPARE = list(range(291, 306))
+
+# T-943: 685-691 used to be the bottom index's fixed slots; the bottom index
+# is now republished at the tail instead (tools/channel/publish_bottom_index.py)
+# and never deletes these -- they are repurposed as editable text slots
+# immediately above the resource-document block (692+ are documents, which
+# can never become editable text again once created).
+POST_LIBRARY_SLOTS = [685, 686, 687, 688, 689, 690, 691]
+
+POST_LIBRARY_SIGNPOST = """<pre>
+📎 R E S O U R C E S   S T A R T   H E R E
+</pre>
+<b>Every lesson's resource archive and subtitle file lives below this
+point.</b> The 📎 and CC links in the index above jump straight to them."""
+
 
 BANNER = """<pre>
 ▄▀█ █
@@ -172,6 +187,12 @@ def build_plan(entries, msg_of, internal, dup_ids, live_by_title, attach_state):
         else:
             plan.append((slot, "text", SPARE.format(label="TAIL SPARE", i=i,
                                                     total=len(TAIL_SPARE) - 1)))
+    for i, slot in enumerate(POST_LIBRARY_SLOTS):
+        if i == 0:
+            plan.append((slot, "text", POST_LIBRARY_SIGNPOST))
+        else:
+            plan.append((slot, "text", SPARE.format(
+                label="POST-LIBRARY SPARE", i=i, total=len(POST_LIBRARY_SLOTS) - 1)))
     for mid, title in dup_ids.items():
         live = live_by_title.get(title)
         body = (ARCHIVED.format(link=f"https://t.me/c/{internal}/{live}")

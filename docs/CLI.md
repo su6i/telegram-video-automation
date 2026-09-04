@@ -154,3 +154,18 @@ uv run --directory /Users/su6i/@-github/telegram-video-automation tools/channel/
 ```bash
 uv run --directory /Users/su6i/@-github/telegram-video-automation tools/channel/remodel_head.py --backup /tmp/head_backup.json --apply
 ```
+
+### Bottom index (republished, not reserved)
+
+Posts a fresh full-parity index (title + 📎 resource + CC subtitle, no slot
+ceiling) at the end of the channel, deletes the previous copy only after the
+new one has fully landed, and moves the pin. Dry run by default and needs no
+network — see `docs/CHANNEL-LAYOUT.md` for the ordering guarantee.
+
+```bash
+uv run --directory /Users/su6i/@-github/telegram-video-automation tools/channel/publish_bottom_index.py
+```
+
+```bash
+uv run --directory /Users/su6i/@-github/telegram-video-automation tools/channel/publish_bottom_index.py --backup /tmp/bottom_index_backup.json --apply
+```

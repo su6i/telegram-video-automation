@@ -1,6 +1,6 @@
 import pytest
 
-from src.index_builder import build_index, build_index_or_fail, visible
+from src.index_builder import UNBOUNDED, build_index, build_index_or_fail, visible
 
 
 def test_title_carries_link_not_number():
@@ -72,3 +72,20 @@ def test_build_index_or_fail_hard_fails():
     assert "index needs" in msg
     # The required number should be in the message
     assert "but only 1 slots exist" in msg
+
+def test_build_index_or_fail_unbounded_does_not_raise():
+    entries = [("Course A", "Section 1", f"{i:03d}", "X") for i in range(1, 111)]
+    msg_of = {f"{i:03d}": 1000 + i for i in range(1, 111)}
+    attach_state = {
+        f"{i:03d}": {"pack_parts": {"1": 2000 + i}, "subtitle": 3000 + i}
+        for i in range(1, 111)
+    }
+    
+    posts_direct = build_index(entries, msg_of, internal=1, attach_state=attach_state)
+    posts_unbounded = build_index_or_fail(
+        entries, msg_of, internal=1, attach_state=attach_state,
+        available_slots=UNBOUNDED, caller="test-caller"
+    )
+    
+    assert posts_direct == posts_unbounded
+    assert len(posts_unbounded) > 1
