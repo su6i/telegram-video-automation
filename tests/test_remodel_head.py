@@ -11,7 +11,10 @@ from remodel_head import (
     HEAD_SPARE,
     INDEX_SLOTS,
     MID_SPARE,
+    POST_LIBRARY_SIGNPOST,
+    POST_LIBRARY_SLOTS,
     TAIL_SPARE,
+    build_plan,
 )
 
 from src.index_builder import (
@@ -159,3 +162,22 @@ def test_reclaimed_index_slots_are_used_before_mid_spare():
     assert INDEX_SLOTS[8:] == [70, 84, 90, 93, 99, 101, 103, 107]
     assert max(INDEX_SLOTS) < min(DIVIDER_SLOTS)
     assert min(MID_SPARE) > max(DIVIDER_SLOTS)
+
+
+def test_remodel_head_includes_post_library_slots():
+    entries = [("Course A", "Section 1", "001", "Intro")]
+    msg_of = {"001": 100}
+    dup_ids = {}
+    live_by_title = {}
+    attach_state = {}
+    plan = build_plan(entries, msg_of, 1, dup_ids, live_by_title, attach_state)
+    
+    post_lib_entries = [p for p in plan if p[0] in POST_LIBRARY_SLOTS]
+    assert len(post_lib_entries) == len(POST_LIBRARY_SLOTS)
+    
+    assert post_lib_entries[0][0] == POST_LIBRARY_SLOTS[0]
+    assert post_lib_entries[0][2] == POST_LIBRARY_SIGNPOST
+    
+    for i in range(1, len(POST_LIBRARY_SLOTS)):
+        assert post_lib_entries[i][0] == POST_LIBRARY_SLOTS[i]
+        assert "POST-LIBRARY SPARE" in post_lib_entries[i][2]

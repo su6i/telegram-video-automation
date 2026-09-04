@@ -17,6 +17,9 @@ ENT_LIMIT = 100        # Telegram's hard per-message entity cap (<a>, <b>, ...).
                        # needed 9 posts. T-940 reclaimed 8 more slots, so that
                        # particular squeeze is gone; the cap is not.)
 
+# sentinel for build_index_or_fail's available_slots: no ceiling on post count -- the per-post char/entity caps inside build_index still apply and still hard-fail.
+UNBOUNDED = None
+
 def utf16_len(s):
     """Telegram's char caps (LIMIT, 4096, CAPTION_LIMIT) count UTF-16 code
     units, not Python characters -- every emoji costs 2 there and 1 in
@@ -128,7 +131,7 @@ def build_index(entries, msg_of, internal, attach_state, include_resource=True, 
 
 def build_index_or_fail(entries, msg_of, internal, attach_state, available_slots, caller, *, include_resource=True, include_subtitle=True, extra_hint=None):
     posts = build_index(entries, msg_of, internal, attach_state, include_resource=include_resource, include_subtitle=include_subtitle)
-    if len(posts) > available_slots:
+    if available_slots is not None and len(posts) > available_slots:
         msg = f"{caller}: index needs {len(posts)} posts but only {available_slots} slots exist."
         if extra_hint:
             msg += "\n" + extra_hint

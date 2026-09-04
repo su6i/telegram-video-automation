@@ -21,9 +21,61 @@ them.
 | `291`–`305` | Tail spare, immediately above the library. The last one is the "library starts here" signpost |
 | `306`+ | The library: 283 lessons, then their resources and subtitles |
 
-## The bottom index (685-691)
+## The bottom index — republished, not reserved (T-943)
 
-There is a second index at the bottom of the channel (ids 685-691). This index has 7 fixed slots and cannot grow ever (692+ are resource documents — they can't be edited into text, can't be moved, and deleting one makes that id permanently un-editable). It is built by the same `src/index_builder.py` shared builder as the head index (`build_index_or_fail`). It carries the title link + CC subtitle link, but not the 📎 resource link (arithmetic: 342 entities today → 625 of the 700 ceiling after adding CC; adding 📎 too would require 722, exceeding budget; the owner rejected stripping bold headers to make room).
+There used to be a second index fixed to ids `685`-`691` — 7 slots, a hard
+700-entity ceiling, which is why it could carry the title link + CC subtitle
+link but not the 📎 resource link (see the superseded arithmetic below). The
+owner's call (2026-09-04): stop treating the bottom index as fixed real
+estate. `tools/channel/publish_bottom_index.py` now **republishes it after
+every upload batch** — it posts a fresh copy at the very end of the channel,
+deletes the previous copy, and moves the pin — so it is always the channel's
+last messages, can never be buried, and carries the same full-parity line as
+the head index (title link + 📎 resource + CC subtitle) with **no slot
+ceiling** (`src/index_builder.UNBOUNDED`).
+
+The ordering is the safety property: new posts are sent, silently
+(`disable_notification=True`), **before** the old ones are deleted, and the
+pin only moves after the delete succeeds. A crash between "post" and "delete"
+leaves the channel with two indexes — redundant, never absent. The tool's own
+state file (`data/bottom_index_state.json` in the vault) tracks which ids are
+currently the live bottom index; on its very first run it is seeded with the
+legacy `685`-`691`, which are deliberately **never passed to delete** (see
+below) — every later cycle deletes the previous cycle's own posts instead.
+
+Ids `685`-`691` themselves are not deleted, ever: `remodel_head.py` now
+repurposes them as `POST_LIBRARY_SLOTS` — a "📎 Resources start here"
+signpost plus 6 spare editable slots, immediately above the resource-document
+block (`692+`, which can never become editable text again). Deleting one of
+the seven instead would have made that id permanently un-editable, for no
+benefit.
+
+**Run order on the first cycle, and only the first.** Because `685`-`691` are
+never deleted, the very first `publish_bottom_index.py --apply` leaves their
+old "📚 Video List" text sitting in the channel while the new index is live at
+the end — two visible indexes, one of them stale. `remodel_head.py --apply` is
+what clears that: it overwrites the seven with the signpost and spare slots.
+So on the first cycle run `publish_bottom_index.py --apply` **then**
+`remodel_head.py --apply`, and do not stop in between. Every later cycle is
+self-contained — it deletes its own previous posts — and needs no companion
+run.
+
+Dry run (no network at all — the tool only reads the local manifest and the
+vault's state files):
+
+```bash
+uv run --directory /Users/su6i/@-github/telegram-video-automation tools/channel/publish_bottom_index.py
+```
+
+```bash
+uv run --directory /Users/su6i/@-github/telegram-video-automation tools/channel/publish_bottom_index.py --backup /tmp/bottom_index_backup.json --apply
+```
+
+*Superseded arithmetic, kept for the record:* under the old fixed-7-slot
+design the index carried 342 entities → 625/700 after adding CC subtitle
+links; adding 📎 resource links too would have needed 722, over budget, and
+stripping bold headers to make room was rejected. None of this applies once
+the slot ceiling is gone.
 
 ## Sizing the index
 
