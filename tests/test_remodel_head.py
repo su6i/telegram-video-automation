@@ -2,6 +2,8 @@ import re
 import sys
 from pathlib import Path
 
+import pytest
+
 sys.path.append(str(Path(__file__).resolve().parents[1] / "tools" / "channel"))
 
 from remodel_head import (
@@ -170,7 +172,7 @@ def test_remodel_head_includes_post_library_slots():
     dup_ids = {}
     live_by_title = {}
     attach_state = {}
-    plan = build_plan(entries, msg_of, 1, dup_ids, live_by_title, attach_state)
+    plan, _ = build_plan(entries, msg_of, 1, dup_ids, live_by_title, attach_state)
     
     post_lib_entries = [p for p in plan if p[0] in POST_LIBRARY_SLOTS]
     assert len(post_lib_entries) == len(POST_LIBRARY_SLOTS)
@@ -181,3 +183,70 @@ def test_remodel_head_includes_post_library_slots():
     for i in range(1, len(POST_LIBRARY_SLOTS)):
         assert post_lib_entries[i][0] == POST_LIBRARY_SLOTS[i]
         assert "POST-LIBRARY SPARE" in post_lib_entries[i][2]
+
+
+def test_spare_content_queue_shifts_by_one_slot_when_index_grows(monkeypatch):
+    import remodel_head
+    content_items = [{"key": "x", "title": "T", "body_html": "hello", "links": []}]
+    
+    monkeypatch.setattr(remodel_head, "build_index_or_fail", lambda *a, **kw: ["p0"])
+    plan_a, _ = build_plan([], {}, 1, {}, {}, {}, content_items=content_items)
+    
+    monkeypatch.setattr(remodel_head, "build_index_or_fail", lambda *a, **kw: ["p0", "p1"])
+    plan_b, _ = build_plan([], {}, 1, {}, {}, {}, content_items=content_items)
+    
+    slot_a = next(slot for slot, _, body in plan_a if "hello" in body)
+    slot_b = next(slot for slot, _, body in plan_b if "hello" in body)
+    assert slot_a == INDEX_SLOTS[1]
+    assert slot_b == INDEX_SLOTS[2]
+
+
+def test_content_over_entity_budget_hard_fails():
+    item = {
+        "key": "x", "title": "T",
+        "body_html": " ".join(f"link{i}" for i in range(105)),
+        "links": [{"text": f"link{i}", "lesson": f"{i:03d}"} for i in range(105)]
+    }
+    msg_of = {f"{i:03d}": 1000 + i for i in range(105)}
+    from remodel_head import render_content_post
+    with pytest.raises(SystemExit):
+        render_content_post(item, msg_of, 1)
+
+
+def test_content_over_char_budget_hard_fails():
+    item = {
+        "key": "x", "title": "T",
+        "body_html": "X" * 5000,
+        "links": []
+    }
+    from remodel_head import render_content_post
+    with pytest.raises(SystemExit):
+        render_content_post(item, {}, 1)
+
+
+def test_slot_past_queue_end_renders_plain_spare():
+    plan, _ = build_plan([], {}, 1, {}, {}, {}, content_items=[])
+    assert any("Reserved slot" in body for _, _, body in plan)
+
+
+def test_content_item_never_lands_outside_the_four_pools():
+    content_items = [{"key": f"k{i}", "title": "T", "body_html": "x", "links": []} for i in range(45)]
+    plan, _ = build_plan([], {}, 1, {}, {}, {}, content_items=content_items)
+    valid_slots = set(INDEX_SLOTS) | set(HEAD_SPARE) | set(DIVIDER_SLOTS) | set(MID_SPARE) | set(TAIL_SPARE) | set(POST_LIBRARY_SLOTS)
+    for slot, _, body in plan:
+        if "<b>T</b>\n\nx" in body:
+            assert slot in valid_slots
+
+
+def test_link_text_not_found_hard_fails():
+    item = {"key": "x", "title": "T", "body_html": "hello", "links": [{"text": "missing", "lesson": "001"}]}
+    from remodel_head import resolve_content_body
+    with pytest.raises(SystemExit):
+        resolve_content_body(item, {"001": 100}, 1)
+
+
+def test_link_lesson_with_no_message_id_hard_fails():
+    item = {"key": "x", "title": "T", "body_html": "hello", "links": [{"text": "hello", "lesson": "001"}]}
+    from remodel_head import resolve_content_body
+    with pytest.raises(SystemExit):
+        resolve_content_body(item, {}, 1)

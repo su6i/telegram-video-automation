@@ -170,3 +170,7 @@ bands above are dead for good.
 
 Re-running `remodel_head.py` is what converts them; the run is 58 text edits and
 0 caption edits (there are no superseded videos left to re-caption).
+
+## Spare-content queue
+
+Instead of leaving reserve slots completely empty with a plain placeholder, `remodel_head.py` now fills them dynamically from an ordered content queue (`spare_content.json`, a vault file not checked into this repo). It is position-independent (never "see the post above"), regenerated fresh every run, and falls back gracefully to the placeholder once the queue is exhausted. `POST_LIBRARY_SLOTS[1:]` (the 6 spares from T-943) act as the LAST pool in queue order, ensuring they don't sit permanently empty while content backs up elsewhere.

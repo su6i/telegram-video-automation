@@ -19,6 +19,7 @@ The layout is data, not code: edit LAYOUT below when the channel grows.
 """
 import argparse
 import asyncio
+import html
 import json
 import os
 import pathlib
@@ -39,7 +40,13 @@ load_dotenv(env_path())
 from pyrogram import Client
 from pyrogram.errors import FloodWait, MessageNotModified
 
-from src.index_builder import build_index_or_fail, read_manifest, utf16_len, visible
+from src.index_builder import (
+    ENT_LIMIT,
+    build_index_or_fail,
+    read_manifest,
+    utf16_len,
+    visible,
+)
 
 CAPTION_LIMIT = 1024
 
@@ -76,6 +83,41 @@ POST_LIBRARY_SIGNPOST = """<pre>
 </pre>
 <b>Every lesson's resource archive and subtitle file lives below this
 point.</b> The 📎 and CC links in the index above jump straight to them."""
+
+
+def count_entities(text):
+    return len(re.findall(r"<a |<b>|<i>|<pre>", text))
+
+def resolve_content_body(item, msg_of, internal):
+    body = item["body_html"]
+    for link in item.get("links", []):
+        text = link["text"]
+        lesson = link["lesson"]
+        mid = msg_of.get(lesson)
+        if mid is None:
+            raise SystemExit(f"remodel_head.py: content item {item['key']!r} links lesson {lesson!r} which has no message id")
+        if text not in body:
+            raise SystemExit(f"remodel_head.py: content item {item['key']!r} link text {text!r} not found in body_html")
+        anchor = f'<a href="https://t.me/c/{internal}/{mid}">{text}</a>'
+        body = body.replace(text, anchor, 1)
+    return body
+
+def render_content_post(item, msg_of, internal):
+    body = resolve_content_body(item, msg_of, internal)
+    text = f"<b>{html.escape(item['title'])}</b>\n\n{body}"
+    ent = count_entities(text)
+    if ent > ENT_LIMIT:
+        raise SystemExit(f"remodel_head.py: content item {item['key']!r} needs {ent} entities, over the {ENT_LIMIT} cap")
+    vis = utf16_len(visible(text))
+    if vis > 4096:
+        raise SystemExit(f"remodel_head.py: content item {item['key']!r} is {vis} UTF-16 units, over the 4096 cap")
+    return text
+
+def spare_pool_size(posts):
+    # POST_LIBRARY_SLOTS[1:] joins the content queue as the last pool so they don't sit permanently empty while content backs up elsewhere
+    return (len(INDEX_SLOTS[len(posts):]) + len(HEAD_SPARE) + 
+            (len(DIVIDER_SLOTS) - len(DIVIDER_ART)) + len(MID_SPARE) + 
+            (len(TAIL_SPARE) - 1) + (len(POST_LIBRARY_SLOTS) - 1))
 
 
 BANNER = """<pre>
@@ -138,7 +180,14 @@ ARCHIVED_PLAIN = ("🗄 <b>Superseded upload</b> — an earlier, lower-quality c
 
 
 # --- the plan ---------------------------------------------------------------
-def build_plan(entries, msg_of, internal, dup_ids, live_by_title, attach_state):
+def build_plan(entries, msg_of, internal, dup_ids, live_by_title, attach_state, content_items=None):
+    content_items = content_items or []
+    content_iter = iter(content_items)
+
+    def take(label, i, total):
+        item = next(content_iter, None)
+        return SPARE.format(label=label, i=i, total=total) if item is None else render_content_post(item, msg_of, internal)
+
     n, c = len(entries), len({e[0] for e in entries})
     
     extra_hint = (
@@ -163,42 +212,36 @@ def build_plan(entries, msg_of, internal, dup_ids, live_by_title, attach_state):
         plan.append((slot, "text", body))
     free = INDEX_SLOTS[len(posts):]
     for i, slot in enumerate(free, 1):
-        plan.append((slot, "text", SPARE.format(label="INDEX SPARE",
-                                                i=i, total=len(free))))
+        plan.append((slot, "text", take("INDEX SPARE", i, len(free))))
     for i, slot in enumerate(HEAD_SPARE, 1):
-        plan.append((slot, "text", SPARE.format(label="HEAD SPARE",
-                                                i=i, total=len(HEAD_SPARE))))
+        plan.append((slot, "text", take("HEAD SPARE", i, len(HEAD_SPARE))))
     for i, slot in enumerate(DIVIDER_SLOTS):
         art = DIVIDER_ART[i] if i < len(DIVIDER_ART) else None
         if art:
             plan.append((slot, "text", f"<pre>{art}</pre>"))
         else:
             j = i - len(DIVIDER_ART) + 1
-            plan.append((slot, "text", SPARE.format(
-                label="SPARE", i=j, total=len(DIVIDER_SLOTS) - len(DIVIDER_ART))))
+            plan.append((slot, "text", take("SPARE", j, len(DIVIDER_SLOTS) - len(DIVIDER_ART))))
     for i, slot in enumerate(MID_SPARE, 1):
-        plan.append((slot, "text", SPARE.format(label="MID SPARE", i=i,
-                                                total=len(MID_SPARE))))
+        plan.append((slot, "text", take("MID SPARE", i, len(MID_SPARE))))
     for i, slot in enumerate(TAIL_SPARE, 1):
         if slot == TAIL_SPARE[-1]:
             plan.append((slot, "text",
                          "<pre>▼ ▼ ▼   T H E   L I B R A R Y   ▼ ▼ ▼</pre>\n"
                          "<b>Lesson 001 starts in the next message.</b>"))
         else:
-            plan.append((slot, "text", SPARE.format(label="TAIL SPARE", i=i,
-                                                    total=len(TAIL_SPARE) - 1)))
+            plan.append((slot, "text", take("TAIL SPARE", i, len(TAIL_SPARE) - 1)))
     for i, slot in enumerate(POST_LIBRARY_SLOTS):
         if i == 0:
             plan.append((slot, "text", POST_LIBRARY_SIGNPOST))
         else:
-            plan.append((slot, "text", SPARE.format(
-                label="POST-LIBRARY SPARE", i=i, total=len(POST_LIBRARY_SLOTS) - 1)))
+            plan.append((slot, "text", take("POST-LIBRARY SPARE", i, len(POST_LIBRARY_SLOTS) - 1)))
     for mid, title in dup_ids.items():
         live = live_by_title.get(title)
         body = (ARCHIVED.format(link=f"https://t.me/c/{internal}/{live}")
                 if live else ARCHIVED_PLAIN)
         plan.append((mid, "caption", body))
-    return plan
+    return plan, posts
 
 
 def duplicate_title(caption, known):
@@ -258,6 +301,14 @@ async def main():
     mp = json.loads((data / "message_ids.json").read_text(encoding="utf-8"))
     attach_state = json.loads(
         (data / "attachments_state.json").read_text(encoding="utf-8"))
+    
+    content_path = data / "spare_content.json"
+    if content_path.exists():
+        content_items = json.loads(content_path.read_text(encoding="utf-8"))
+    else:
+        content_items = []
+        print(f"⚠️  no spare content at {content_path}, all spare slots fall back to the placeholder")
+
     msg_of = {k: (v if isinstance(v, int) else v.get("video")) for k, v in mp.items()}
     entries = read_manifest()
     live_by_title = {t: msg_of.get(num) for _, _, num, t in entries}
@@ -283,7 +334,7 @@ async def main():
                 # live lesson, which is the confusion this pass exists to end.
                 dup_ids[m.id] = duplicate_title(cap, set(live_by_title))
 
-        plan = build_plan(entries, msg_of, internal, dup_ids, live_by_title, attach_state)
+        plan, posts = build_plan(entries, msg_of, internal, dup_ids, live_by_title, attach_state, content_items=content_items)
 
         touched = [mid for mid, _, _ in plan if mid not in backup]
         for i in range(0, len(touched), 100):
@@ -306,6 +357,12 @@ async def main():
                 if utf16_len(visible(b)) > (CAPTION_LIMIT if k == "caption" else 4096)]
         if over:
             raise SystemExit(f"❌ {len(over)} message(s) exceed the limit: {over[:5]}")
+
+        placed = min(len(content_items), spare_pool_size(posts))
+        unfit = content_items[placed:]
+        print(f"🗂 spare content: {placed}/{len(content_items)} item(s) placed in {spare_pool_size(posts)} pool slot(s)")
+        if unfit:
+            print(f"⚠️  {len(unfit)} content item(s) did not fit and were held back: {[u['key'] for u in unfit]}")
 
         print(f"📋 plan: {len(plan)} edits "
               f"({sum(1 for _, k, _ in plan if k == 'text')} text, "
