@@ -14,6 +14,7 @@ REPO = pathlib.Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPO))
 
 from src.env_resolver import env_path
+from src.index_builder import build_index_or_fail, read_manifest
 
 # Load env
 load_dotenv(env_path())
@@ -27,69 +28,12 @@ CHANNEL_TARGET = os.getenv("CHANNEL_USERNAME") or CHANNEL_ID
 # Storage directory
 STORAGE_DIR = ".storage"
 # Files
-MANIFEST_FILE = os.path.join(STORAGE_DIR, "downloaded_video.txt")
-UPLOAD_HISTORY_FILE = os.path.join(STORAGE_DIR, "upload_history.json")
 INDEX_STATE_FILE = os.path.join(STORAGE_DIR, "channel_index_info.json")
+# ids 685-691, fixed forever. 692+ are resource *documents*: a document cannot be
+# edited into a text message, a message cannot be moved, and deleting one only makes
+# its id permanently un-editable. There is no eighth slot and there never will be.
+BOTTOM_INDEX_SLOTS = 7
 
-def parse_manifest():
-    """Reads manifest and returns structured data: [ {course, section, index, title, url} ]"""
-    videos = []
-    if not os.path.exists(MANIFEST_FILE):
-        return videos
-
-    current_course = "Unknown"
-    current_section = "General"
-    
-    with open(MANIFEST_FILE, "r", encoding="utf-8") as f:
-        for line in f:
-            line = line.strip()
-            if not line: continue
-            
-            if line.startswith("# === "):
-                content = line.replace("# === ", "").split(" ===")[0]
-                if "(" in content:
-                    current_course = content.split("(")[0].strip()
-                else:
-                    current_course = content
-                current_section = "General"
-            elif line.startswith("## --- "):
-                current_section = line.replace("## --- ", "").replace(" ---", "").strip()
-            elif " | " in line:
-                # Video line, check for # [DONE]
-                clean = line.replace("# [DONE] ", "")
-                parts = clean.split(" | ")
-                if len(parts) >= 3:
-                    # Index | Title | URL OR Index | Section | Title | URL
-                    # We assume Index | Title | URL based on scraper default
-                    # But scraper has `if vid_section... write section` logic?
-                    # Let's check parts.
-                    vid_idx = parts[0]
-                    vid_url = parts[-1]
-                    
-                    if len(parts) == 4:
-                         # Index | Section | Title | URL
-                         vid_title = parts[2]
-                         vid_section_inline = parts[1] # Override current section?
-                    else:
-                         vid_title = parts[1]
-                    
-                    videos.append({
-                        "course": current_course,
-                        "section": current_section,
-                        "index": vid_idx,
-                        "title": vid_title,
-                        "url": vid_url
-                    })
-    return videos
-
-def load_history():
-    if os.path.exists(UPLOAD_HISTORY_FILE):
-        try:
-            with open(UPLOAD_HISTORY_FILE, "r", encoding="utf-8") as f:
-                return json.load(f)
-        except:
-            pass
-    return {}
 
 def load_state():
     if os.path.exists(INDEX_STATE_FILE):
@@ -104,70 +48,29 @@ def save_state(state):
     with open(INDEX_STATE_FILE, "w", encoding="utf-8") as f:
         json.dump(state, f, indent=2)
 
-def generate_index_text(videos, history):
-    """Generates a list of strings (blocks) < 4096 chars."""
-    blocks = []
-    current_block = ""
-    
-    last_course = None
-    last_section = None
-    
-    header = "📚 **Course Index**\n\n"
-    current_block += header
-    
-    for v in videos:
-        # Group Headers
-        if v['course'] != last_course:
-            course_head = f"\n🎓 **{v['course']}**\n"
-            if len(current_block) + len(course_head) > 4000:
-                blocks.append(current_block)
-                current_block = header + course_head # Repeat header on new page? Or just course head
-            else:
-                current_block += course_head
-            last_course = v['course']
-            last_section = None # Reset section
-            
-        if v['section'] != last_section and v['section'] != "General":
-            sect_head = f"\n📂 __{v['section']}__\n"
-            if len(current_block) + len(sect_head) > 4000:
-                blocks.append(current_block)
-                current_block = sect_head
-            else:
-                current_block += sect_head
-            last_section = v['section']
-            
-        # Line
-        # Check history for link
-        idx = v['index']
-        hist = history.get(idx)
-        
-        line = ""
-        if hist and hist.get('link'):
-            line = f"{idx} - [{v['title']}]({hist['link']})\n"
-        else:
-             # No link yet
-            line = f"{idx} - {v['title']}\n"
-            
-        if len(current_block) + len(line) > 4000:
-            blocks.append(current_block)
-            current_block = line
-        else:
-            current_block += line
-            
-    if current_block:
-        blocks.append(current_block)
-        
-    return blocks
-
 async def main():
     os.makedirs(STORAGE_DIR, exist_ok=True)
     print("🔄 Generating Index...")
-    videos = parse_manifest()
-    history = load_history()
-    print(f"   Found {len(videos)} videos in manifest.")
-    print(f"   Found {len(history)} items in upload history.")
     
-    blocks = generate_index_text(videos, history)
+    entries = read_manifest()
+    
+    data = pathlib.Path(os.getenv(
+        "TVA_DATA",
+        "/Users/su6i/.local/share/agent-projects/telegram-video-automation/data"))
+    
+    mp = json.loads((data / "message_ids.json").read_text(encoding="utf-8"))
+    attach_state = json.loads(
+        (data / "attachments_state.json").read_text(encoding="utf-8"))
+    msg_of = {k: (v if isinstance(v, int) else v.get("video")) for k, v in mp.items()}
+    
+    chat_id = int(CHANNEL_ID)
+    internal = abs(chat_id) - 1000000000000
+    
+    blocks = build_index_or_fail(
+        entries, msg_of, internal, attach_state, BOTTOM_INDEX_SLOTS,
+        "scripts/generate_index.py", include_resource=False, include_subtitle=True
+    )
+    
     print(f"   Generated {len(blocks)} message blocks.")
     
     state = load_state()

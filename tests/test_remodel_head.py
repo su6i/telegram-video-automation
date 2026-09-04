@@ -4,7 +4,21 @@ from pathlib import Path
 
 sys.path.append(str(Path(__file__).resolve().parents[1] / "tools" / "channel"))
 
-from remodel_head import build_index, resource_and_subtitle_ids, visible
+from remodel_head import (
+    ABOUT_SLOT,
+    BANNER_SLOT,
+    DIVIDER_SLOTS,
+    HEAD_SPARE,
+    INDEX_SLOTS,
+    MID_SPARE,
+    TAIL_SPARE,
+)
+
+from src.index_builder import (
+    build_index,
+    resource_and_subtitle_ids,
+    visible,
+)
 
 
 def test_resource_and_subtitle_ids_with_pack_parts():
@@ -42,8 +56,8 @@ def test_build_index_glyph_output():
     assert len(posts) == 1
     post = posts[0]
 
-    assert '<a href="https://t.me/c/1/100">001</a> <a href="https://t.me/c/1/200">📎</a> <a href="https://t.me/c/1/201">CC</a> · Intro' in post
-    assert '<a href="https://t.me/c/1/101">002</a> · Next' in post
+    assert '001 <a href="https://t.me/c/1/200">📎</a> <a href="https://t.me/c/1/201">CC</a> · <a href="https://t.me/c/1/100">Intro</a>' in post
+    assert '002 · <a href="https://t.me/c/1/101">Next</a>' in post
 
 
 def _entity_count(post):
@@ -118,3 +132,30 @@ def test_index_entity_cap_holds_across_a_course_boundary():
     posts = build_index(entries, msg_of, internal=1, attach_state={})
     for post in posts:
         assert _entity_count(post) <= 100
+
+
+def test_slot_map_has_no_deleted_ids_and_no_overlap():
+    """T-940: the reclaimed orphans are real, editable ids — 12-64 and 238-290
+    are deleted end to end (verified live 2026-09-03) and must never appear in
+    any slot list, because a deleted message can never be edited back."""
+    dead = set(range(12, 65)) | set(range(238, 291))
+    pools = {"INDEX_SLOTS": INDEX_SLOTS, "HEAD_SPARE": HEAD_SPARE,
+             "DIVIDER_SLOTS": DIVIDER_SLOTS, "MID_SPARE": MID_SPARE,
+             "TAIL_SPARE": TAIL_SPARE}
+    for name, pool in pools.items():
+        assert not dead.intersection(pool), f"{name} claims a deleted id"
+
+    all_slots = [BANNER_SLOT, ABOUT_SLOT] + [s for p in pools.values() for s in p]
+    assert len(all_slots) == len(set(all_slots)), "a slot id is claimed twice"
+    assert max(all_slots) < 306, "a slot reaches into the library"
+    assert INDEX_SLOTS == sorted(INDEX_SLOTS), "index posts must read in id order"
+
+
+def test_reclaimed_index_slots_are_used_before_mid_spare():
+    """The 8 orphans in 65-109 extend the index because 12-64 is deleted, so
+    they render directly under slot 11. MID_SPARE sits below the divider and is
+    deliberately not index capacity."""
+    assert len(INDEX_SLOTS) == 16
+    assert INDEX_SLOTS[8:] == [70, 84, 90, 93, 99, 101, 103, 107]
+    assert max(INDEX_SLOTS) < min(DIVIDER_SLOTS)
+    assert min(MID_SPARE) > max(DIVIDER_SLOTS)
