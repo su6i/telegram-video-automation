@@ -145,7 +145,7 @@ placeholders and the follow-up index update.
 ### Channel head
 
 Rewrite the banner, the about post, the full index and the reserved slots above
-the library. Dry run by default; see `docs/CHANNEL-LAYOUT.md` for the slot map.
+the library. Spare slots render real content from `spare_content.json` when present, falling back to the reserved-slot placeholder otherwise. Dry run by default; see `docs/CHANNEL-LAYOUT.md` for the slot map.
 
 ```bash
 uv run --directory /Users/su6i/@-github/telegram-video-automation tools/channel/remodel_head.py --backup /tmp/head_backup.json --preview /tmp/head_preview.txt

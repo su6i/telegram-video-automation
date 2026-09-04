@@ -3,6 +3,7 @@
 ## Unreleased
 
 ### Added
+- T-942: `remodel_head.py` now fills the spare-slot pools from an ordered content queue (a vault-only JSON file, `spare_content.json`, never in this repo) instead of the plain placeholder. It degrades gracefully to the placeholder once the queue is exhausted, applies per-post entity/char budget hard-fails, and prints a report of items placed/held-back. `POST_LIBRARY_SLOTS[1:]` participates as the last pool in the queue.
 - T-943: new `tools/channel/publish_bottom_index.py` replaces the fixed
   685-691 bottom-index slots with a republish cycle — post the new full-parity
   index (title + 📎 resource + CC subtitle, the same line the head index
